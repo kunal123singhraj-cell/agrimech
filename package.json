@@ -1,0 +1,17 @@
+{
+  "name": "agrimech",
+  "version": "1.0.0",
+  "description": "AgriMech B2B Agricultural Residue & 3PL Logistics Platform",
+  "scripts": {
+    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "build:frontend": "cd frontend && npm install && npm run build",
+    "build:backend": "cd backend && npm install && npm run build",
+    "build": "npm run build:frontend && npm run build:backend",
+    "start": "node backend/dist/server.js",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm start"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

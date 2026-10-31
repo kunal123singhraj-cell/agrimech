@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  agrimech-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agrimech-platform
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - MONGODB_URI=mongodb+srv://kunal123singhraj_db_user:kunal12345@cluster0.yc8lmjw.mongodb.net/agrimech?retryWrites=true&w=majority
+      - JWT_SECRET=agrimech_jwt_super_secret_production_key_2026

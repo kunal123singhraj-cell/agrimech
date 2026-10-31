@@ -1,0 +1,481 @@
+import { Injectable, signal, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Router, NavigationEnd } from '@angular/router';
+import { I18nLanguage } from '../models/marketplace.model';
+import { getApiBaseUrl } from '../config/api.config';
+
+export interface LanguageOption {
+  code: I18nLanguage;
+  name: string;
+  nativeName: string;
+  flag: string;
+}
+
+@Injectable({
+  providedIn: 'root'
+})
+export class I18nService {
+  private http = inject(HttpClient);
+  private router = inject(Router);
+  private apiBase = getApiBaseUrl();
+
+  readonly languages: LanguageOption[] = [
+    { code: 'en', name: 'English', nativeName: 'English', flag: '🇬🇧' },
+    { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', flag: '🇮🇳' },
+    { code: 'kn', name: 'Kannada', nativeName: 'ಕನ್ನಡ', flag: '🇮🇳' },
+    { code: 'ta', name: 'Tamil', nativeName: 'தமிழ்', flag: '🇮🇳' },
+    { code: 'te', name: 'Telugu', nativeName: 'తెలుగు', flag: '🇮🇳' },
+    { code: 'ml', name: 'Malayalam', nativeName: 'മലയാളം', flag: '🇮🇳' },
+    { code: 'mr', name: 'Marathi', nativeName: 'मराठी', flag: '🇮🇳' },
+    { code: 'bn', name: 'Bengali', nativeName: 'বাংলা', flag: '🇮🇳' }
+  ];
+
+  currentLanguage = signal<I18nLanguage>('en');
+  chatLanguage = signal<I18nLanguage>('en');
+
+  // Cache for original English DOM text nodes so we can revert cleanly
+  private originalTextMap = new WeakMap<Node, string>();
+  private domObserver: MutationObserver | null = null;
+  private isTranslating = false;
+
+  // Universal Multilingual Phrase Dictionary
+  // Covers Navigation, Dashboards, Residue Types, Actions, Statuses, and Tables
+  private phraseDictionary: Record<string, Partial<Record<I18nLanguage, string>>> = {
+    // Navigation & Global Titles
+    'AgriMech': { hi: 'एग्रीमेक', kn: 'ಅಗ್ರಿಮೆಕ್', ta: 'அக்ரிமெக்', te: 'అగ్రిమెక్', ml: 'അഗ്രിമെക്ക്', mr: 'एग्रीमेक', bn: 'এগ্রিম্যাক' },
+    'B2B Agricultural Residue & Bio-Energy Marketplace': {
+      hi: 'बी2बी कृषि अवशेष और बायो-एनर्जी मार्केटप्लेस',
+      kn: 'ಬಿ2ಬಿ ಕೃಷಿ ತ್ಯಾಜ್ಯ ಮತ್ತು ಜೈವಿಕ ಶಕ್ತಿ ಮಾರುಕಟ್ಟೆ',
+      ta: 'விவசாயக் கழிவு & உயிரி-எரிசக்தி சந்தை',
+      te: 'వ్యవసాయ వ్యర్థాలు ಮತ್ತು ಬಯೋ-ఎనర్జీ మార్కెట్',
+      ml: 'കാർഷിക അവശിഷ്ട വിപണി',
+      mr: 'शेती अवशेष व बायो-एनर्जी मार्केटप्लेस',
+      bn: 'কৃষি অবশিষ্টাংশ এবং বায়ো-এনার্জি মার্কেটপ্লেস'
+    },
+    'Seller Dashboard': { hi: 'विक्रेता डैशबोर्ड', kn: 'ಮಾರಾಟಗಾರ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್', ta: 'விற்பனையாளர் டாஷ்போர்டு', te: 'విక్రేత డాష్‌బోర్డ్', ml: 'കർഷക ഡാഷ്‌ബോർഡ്', mr: 'विक्रेता डॅशबोर्ड', bn: 'বিক্রেতা ড্যাশবোর্ড' },
+    'Buyer Dashboard': { hi: 'क्रेता डैशबोर्ड', kn: 'ಖರೀದಿದಾರ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್', ta: 'வாங்குபவர் டாஷ்போர்டு', te: 'కొనుగోలుదారు డాష్‌బోర్డ్', ml: 'വാങ്ങുന്നയാളുടെ ഡാഷ്‌ബോർഡ്', mr: 'खरेदीदार डॅशबोर्ड', bn: 'ক্রেতা ড্যাশবোর্ড' },
+    '3PL Logistics Workspace': { hi: '3PL लॉजिस्टिक्स वर्कस्पेस', kn: '3PL ಲಾಜಿಸ್ಟಿಕ್ಸ್ ವರ್ಕ್‌ಸ್ಪೇಸ್', ta: '3PL போக்குவரத்து பணிமனை', te: '3PL రవాణా వేదిక', ml: '3PL ലോജിസ്റ്റിക്സ് വർക്ക്‌സ്‌പേസ്', mr: '3PL वाहतूकदार कार्यक्षेत्र', bn: '3PL পরিবহন ওয়ার্কস্পেস' },
+    'Admin Revenue & Oversight': { hi: 'प्रशासक राजस्व और निगरानी', kn: 'ಆಡಳಿತ ಆದಾಯ ಮತ್ತು ಮೇಲ್ವಿಚಾರಣೆ', ta: 'நிர்வாக வருவாய் & மேற்பார்வை', te: 'పరిపాలన మరియు రాబడి', ml: 'അഡ്മിൻ വരുമാനം', mr: 'प्रशासक महसूल', bn: 'প্রশাসক রাজস্ব ও নজরদারি' },
+    '100 km Live Radar & Map': { hi: '100 किमी लाइव रडार और मैप', kn: '100 ಕಿಮೀ ಲೈವ್ ರೇಡಾರ್ & ಭೂಪಟ', ta: '100 கிமீ நேரடி ரேடார் & வரைபடம்', te: '100 కిమీ లైవ్ రాడార్ & మ్యాప్', ml: '100 കിമീ റഡാർ', mr: '१०० किमी लाईव्ह रडार व मॅप', bn: '১০০ কিমি লাইভ রাডার ও ম্যাপ' },
+    '100 KM LIVE RADAR': { hi: '100 किमी लाइव रडार', kn: '100 ಕಿಮೀ ಲೈವ್ ರೇಡಾರ್', ta: '100 கிமீ நேரடி ரேடார்', te: '100 కిమీ లైవ్ రాడార్', ml: '100 കിമീ റഡാർ', mr: '१०० किमी लाईव्ह रडार', bn: '১০০ কিমি লাইভ রাডার' },
+    'Residue Categories': { hi: 'फसल अवशेष श्रेणियां', kn: 'ಬೆಳೆ ತ್ಯಾಜ್ಯ ವರ್ಗಗಳು', ta: 'கழிவு வகைகள்', te: 'వ్యర్థాల వర్గాలు', ml: 'വിള അവശിഷ്ടങ്ങൾ', mr: 'पीक अवशेष वर्ग', bn: 'ফসলের অবশিষ্টাংশ' },
+    'Freight Calculator': { hi: 'भाड़ा कैलकुलेटर', kn: 'ಸಾರಿಗೆ ವೆಚ್ಚ ಕ್ಯಾಲ್ಕುಲೇಟರ್', ta: 'வாடகை கால்குலேட்டர்', te: 'రవాణా ఖర్చు క్యాలిక్యులేటర్', ml: 'ചരക്കുകൂലി കാൽക്കുലേറ്റർ', mr: 'वाहतूक भाडे कॅल्क्युलेटर', bn: 'ভাড়া ক্যালকুলেটর' },
+    'Multi-Farmer Optimizer': { hi: 'मल्टी-फार्मर ऑप्टिमाइज़र', kn: 'ಬಹು-ರೈತ ಆದೇಶ ಆಪ್ಟಿಮೈಜರ್', ta: 'விவசாயிகள் தொகுப்பு', te: 'మల్టీ-ఫార్మర్ ఆర్డర్ ఆప్టిమైజర్', ml: 'ഓർഡർ ഒപ്റ്റിമൈസർ', mr: 'मल्टी-फार्मर ऑप्टिमायझर', bn: 'মাল্টি-ফার্মার অপ্টিমাইজার' },
+    'New Listing': { hi: 'नई लिस्टिंग', kn: 'ಹೊಸ ದಾಸ್ತಾನು', ta: 'புதிய பட்டியல்', te: 'కొత్త లిస్టింగ్', ml: 'പുതിയ ലിസ്റ്റിംഗ്', mr: 'नवीन नोंदणी', bn: 'নতুন তালিকা' },
+    'Find Suppliers (AQI)': { hi: 'बायोमास सप्लायर्स खोजें', kn: 'ಪೂರೈಕೆದಾರರನ್ನು ಹುಡುಕಿ', ta: 'விற்பனையாளர்களைக் கண்டறியவும்', te: 'సరఫరాదారులను కనుగొనండి', ml: 'വിതരണക്കാരെ കണ്ടെത്തുക', mr: 'पुरवठादार शोधा', bn: 'সরবরাহকারী খুঁজুন' },
+    'Find Biomass Suppliers': { hi: 'बायोमास सप्लायर्स खोजें', kn: 'ಪೂರೈಕೆದಾರರನ್ನು ಹುಡುಕಿ', ta: 'விற்பனையாளர்களைக் கண்டறியவும்', te: 'సరఫరాదారులను కనుగొనండి', ml: 'വിതരണക്കാരെ കണ്ടെത്തുക', mr: 'पुरवठादार शोधा', bn: 'সরবরাহকারী খুঁজুন' },
+    'Bulk Demand Pools': { hi: 'थोक मांग पूल', kn: 'ದೊಡ್ಡ ಬೇಡಿಕೆ ಪೂಲ್', ta: 'மொத்த தேவைகள்', te: 'బల్క్ డిమాండ్ పూల్స్', ml: 'ബൾക്ക് ഡിമാൻഡ്', mr: 'मोठ्या मागण्या', bn: 'পাইকারি চাহিদা' },
+    'Offers & Inquiries': { hi: 'प्रस्ताव और पूछताछ', kn: 'ಪ್ರಸ್ತಾಪಗಳು ಮತ್ತು ವಿಚಾರಣೆ', ta: 'சலுகைகள் & விசாரணைகள்', te: 'ఆఫర్లు & విచారణలు', ml: 'ഓഫറുകൾ', mr: 'ऑफर व चौकशी', bn: 'অফার ও অনুসন্ধান' },
+    'Multilingual Negotiation': { hi: 'बहुभाषी बातचीत केंद्र', kn: 'ಬಹುಭಾಷಾ ಮಾತುಕತೆ ಕೇಂದ್ರ', ta: 'பன்மொழி பேச்சுவார்த்தை', te: 'బహుభాషా సంప్రదింపుల కేంద్రం', ml: 'ബഹുഭാഷാ ചർച്ചാ കേന്ദ്രം', mr: 'बहुभाषिक वाटाघाटी कक्ष', bn: 'বহুভাষিক আলোচনা কেন্দ্র' },
+    'Dispatch Orders': { hi: 'कंसाइनमेंट ऑर्डर्स', kn: 'ಆದೇಶಗಳು ಮತ್ತು ಸಾಗಣೆ', ta: 'ஆர்டர்கள்', te: 'ఆర్డర్లు మరియు సరుకు', ml: 'ഓർഡറുകൾ', mr: 'मागण्या व ऑर्डर्स', bn: 'অর্ডার সমূহ' },
+    'Consignment Orders': { hi: 'कंसाइनमेंट ऑर्डर्स', kn: 'ಆದೇಶಗಳು ಮತ್ತು ಸಾಗಣೆ', ta: 'ஆர்டர்கள்', te: 'ఆర్ಡర్లు এবং సరుకు', ml: 'ഓർഡറുകൾ', mr: 'मागण्या व ऑर्डर्स', bn: 'অর্ডার সমূহ' },
+    'Notifications': { hi: 'सूचनाएं', kn: 'ಸೂಚನೆಗಳು', ta: 'அறிவிப்புகள்', te: 'నోటిఫికేషన్లు', ml: 'അറിയിപ്പുകൾ', mr: 'सूचना', bn: 'বিজ্ঞপ্তি' },
+    'Profile & Settings': { hi: 'प्रोफाइल और सेटिंग्स', kn: 'ಪ್ರೊಫೈಲ್ ಮತ್ತು ಸೆಟ್ಟಿಂಗ್‌ಗಳು', ta: 'சுயவிவரம்', te: 'ప్రొఫైల్ మరియు సెట్టింగ్‌లు', ml: 'പ്രൊഫൈൽ', mr: 'प्रोफाइल व सेटिंग्ज', bn: 'প্রোফাইল ও সেটিংস' },
+    'Switch Role': { hi: 'भूमिका बदलें', kn: 'ಪಾತ್ರ ಬದಲಾಯಿಸಿ', ta: 'பங்கை மாற்றவும்', te: 'పాత్ర మార్చుకోండి', ml: 'റോൾ മാറ്റുക', mr: 'भूमिका बदला', bn: 'ভূমিকা পরিবর্তন' },
+    'Logout': { hi: 'लॉग आउट', kn: 'ಲಾಗ್ ಔಟ್', ta: 'வெளியேறு', te: 'లాగ్ అవుట్', ml: 'ലോഗ് ഔട്ട്', mr: 'लॉग आउट', bn: 'লগ আউট' },
+
+    // Role Names & Cards
+    'Farmer / Seller': { hi: 'किसान / विक्रेता', kn: 'ರೈತ / ಮಾರಾಟಗಾರ', ta: 'விவசாயி / விற்பனையாளர்', te: 'రైతు / విక్రేత', ml: 'കർഷകൻ / വിൽപ്പനക്കാരൻ', mr: 'शेतकरी / विक्रेता', bn: 'কৃষক / বিক্রেতা' },
+    'Industrial Biomass Buyer': { hi: 'औद्योगिक बायोमास खरीदार', kn: 'ಕೈಗಾರಿಕಾ ಬಯೋಮಾಸ್ ಖರೀದಿದಾರ', ta: 'தொழில்துறை வாங்குபவர்', te: 'పారిశ్రాમિક కొనుగోలుదారు', ml: 'വ്യാവസായിക ഉപഭോക്താവ്', mr: 'औद्योगिक बायोमास खरेदीदार', bn: 'শিল্প বায়োমাস ক্রেতা' },
+    '3PL Transporter & Fleet Manager': { hi: '3PL ट्रांसपोर्टर व फ्लीट प्रबंधक', kn: '3PL ಸಾರಿಗೆ ಮತ್ತು ವಾಹನ ನಿರ್ವಾಹಕ', ta: '3PL போக்குவரத்து மேலாளர்', te: '3PL రవాణాదారు', ml: '3PL ലോജിസ്റ്റിക്സ് മാനേജർ', mr: '3PL वाहतूकदार व्यवस्थापक', bn: '3PL পরিবহন ও ফ্লিট ম্যানেজার' },
+    'Platform Administrator': { hi: 'प्लेटफॉर्म प्रशासक', kn: 'ವೇದಿಕೆ ಆಡಳಿತಾಧಿಕಾರಿ', ta: 'தள நிர்வாகி', te: 'ప్లాట్‌ఫారమ్ అడ్మినిస్ట్రేటర్', ml: 'പ്ലാറ്റ്ഫോം അഡ്മിനിസ്ട്രേറ്റർ', mr: 'प्लॅटफॉर्म प्रशासक', bn: 'প্ল্যাটফর্ম অ্যাডমিনিস্ট্রেটর' },
+    'Continue as Farmer / Seller': { hi: 'किसान / विक्रेता के रूप में आगे बढ़ें', kn: 'ರೈತ / ಮಾರಾಟಗಾರರಾಗಿ ಮುಂದುವರಿಯಿರಿ', ta: 'விவசாயியாக தொடரவும்', te: 'రైతుగా కొనసాగండి', ml: 'കർഷകനായി തുടരുക', mr: 'शेतकरी म्हणून पुढे चला', bn: 'কৃষক হিসেবে এগিয়ে যান' },
+    'Continue as Industrial Buyer': { hi: 'औद्योगिक खरीदार के रूप में आगे बढ़ें', kn: 'ಖರೀದಿದಾರರಾಗಿ ಮುಂದುವರಿಯಿರಿ', ta: 'வாங்குபவராக தொடரவும்', te: 'కొనుగోలుదారుగా కొనసాగండి', ml: 'വാങ്ങുന്നയാളായി തുടരുക', mr: 'खरेदीदार म्हणून पुढे चला', bn: 'ক্রেতা হিসেবে এগিয়ে যান' },
+    'Continue as 3PL Transporter': { hi: '3PL ट्रांसपोर्टर के रूप में आगे बढ़ें', kn: '3PL ಸಾರಿಗೆದಾರರಾಗಿ ಮುಂದುವರಿಯಿರಿ', ta: '3PL போக்குவரத்து நிறுவனமாக தொடரவும்', te: '3PL రవాణాదారుగా కొనసాగండి', ml: '3PL ആയി തുടരുക', mr: 'वाहतूकदार म्हणून पुढे चला', bn: '3PL পরিবহনকারী হিসেবে এগিয়ে যান' },
+    'Continue as Platform Administrator': { hi: 'प्रशासक के रूप में आगे बढ़ें', kn: 'ಆಡಳಿತಾಧಿಕಾರಿಯಾಗಿ ಮುಂದುವರಿಯಿರಿ', ta: 'நிர்வாகியாக தொடரவும்', te: 'అడ్మిన్‌గా కొనసాగండి', ml: 'അഡ്മിനായി തുടരുക', mr: 'प्रशासक म्हणून पुढे चला', bn: 'অ্যাডমিনিস্ট্রেটর হিসেবে এগিয়ে যান' },
+
+    // Crop Residue Types
+    'Paddy Straw': { hi: 'धान की पराली', kn: 'ಭತ್ತದ ಹುಲ್ಲು', ta: 'நெல் வைக்கோல்', te: 'వరి గడ్డి', ml: 'നെല്ല് വൈക്കോൽ', mr: 'भाताचा पेंढा', bn: 'ধানের খড়' },
+    'Wheat Straw': { hi: 'गेहूं का भूसा', kn: 'ಗೋಧಿ ಹುಲ್ಲು', ta: 'கோதுமை வைக்கோல்', te: 'గోధుమ గడ్డి', ml: 'ഗോതമ്പ് വൈക്കോൽ', mr: 'गव्हाचा भुसा', bn: 'গমের খড়' },
+    'Sugarcane Bagasse': { hi: 'गन्ने की खोई (बगास)', kn: 'ಕಬ್ಬಿನ ಸಿಪ್ಪೆ (ಬಗಾಸ್)', ta: 'கரும்பு சக்கை', te: 'చెరకు పిప్పి', ml: 'കരിമ്പ് ചണ്ടി', mr: 'उसाची बगॅस', bn: 'আখের ছোবড়া' },
+    'Cotton Stalks': { hi: 'कपास की डंठल', kn: 'ಹತ್ತಿ ಕಾಂಡಗಳು', ta: 'பருத்தி குச்சிகள்', te: 'పత్తి కాడలు', ml: 'പരുത്തി തണ്ടുകൾ', mr: 'कापसाची पराटी', bn: 'তুলার ডালপালা' },
+    'Mustard Husk': { hi: 'सरसों का भूसा', kn: 'ಸಾಸಿವೆ ಹೊಟ್ಟು', ta: 'கடுகு உமி', te: 'ఆవాల పొట్టు', ml: 'കടുക് തൊണ്ട്', mr: 'मोहरीचा भुसा', bn: 'সরিষার খোসা' },
+    'Corn Stover': { hi: 'मक्के का डंठल', kn: 'ಮೆಕ್ಕೆಜೋಳದ ತ್ಯಾಜ್ಯ', ta: 'மக்காச்சோள தட்டை', te: 'మొక్కజొన్న వ్యర్థాలు', ml: 'ചോളത്തണ്ട്', mr: 'मक्याचे ताट', bn: 'ভুট্টার অবশিষ্টাংশ' },
+    'Groundnut Shells': { hi: 'मूंगफली के छिलके', kn: 'ಕಡಲೆಕಾಯಿ ಸಿಪ್ಪೆ', ta: 'வேர்க்கடலை ஓடு', te: 'వేరుశనగ పొట్టు', ml: 'നിലക്കടല തോട്', mr: 'भुईमुगाची टरफले', bn: 'চিনাবাদামের খোসা' },
+    'Soybean Straw': { hi: 'सोयाबीन का भूसा', kn: 'ಸೋಯಾಬೀನ್ ಹುಲ್ಲು', ta: 'சோயாபீன் வைக்கோல்', te: 'సోయాబీన్ గడ్డి', ml: 'സോയാബീൻ വൈക്കോൽ', mr: 'सोयाबीन भुसा', bn: 'সয়াবিনের খড়' },
+
+    // Common UI labels, table headers & dialogs
+    'All': { hi: 'सभी', kn: 'ಎಲ್ಲಾ', ta: 'அனைத்தும்', te: 'అన్నీ', ml: 'എല്ലാം', mr: 'सर्व', bn: 'সব' },
+    'Active': { hi: 'सक्रिय', kn: 'ಸಕ್ರಿಯ', ta: 'செயலில்', te: 'క్రియాశీల', ml: 'സജീവം', mr: 'सक्रिय', bn: 'সক্রিয়' },
+    'Pending': { hi: 'लंबित', kn: 'ಬಾಕಿ ಇದೆ', ta: 'நிலுவை', te: 'పెండింగ్', ml: 'തീർപ്പുകൽപ്പിക്കാത്തത്', mr: 'प्रलंबित', bn: 'বিচারাধীন' },
+    'Completed': { hi: 'पूर्ण', kn: 'ಪೂರ್ಣಗೊಂಡಿದೆ', ta: 'முடிந்தது', te: 'పూర్తయింది', ml: 'പൂർത്തിയായി', mr: 'पूर्ण झाले', bn: 'সম্পূর্ণ' },
+    'Confirmed': { hi: 'पुष्ट', kn: 'ದೃಢೀಕರಿಸಲಾಗಿದೆ', ta: 'உறுதிப்படுத்தப்பட்டது', te: 'ధృవీకరించబడింది', ml: 'സ്ഥിരീകരിച്ചു', mr: 'पुष्टी केली', bn: 'নিশ্চিত' },
+    'Cancelled': { hi: 'रद्द', kn: 'ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ', ta: 'ரத்து செய்யப்பட்டது', te: 'రద్దు చేయబడింది', ml: 'റദ്ദാക്കി', mr: 'रद्द केले', bn: 'বাতিল' },
+    'Overview': { hi: 'अवलोकन', kn: 'ಅವಲೋಕನ', ta: 'கண்ணோட்டம்', te: 'అవలోకనం', ml: 'അവലോകനം', mr: 'आढावा', bn: 'সংক্ষিপ্ত বিবরণ' },
+    'Farmer': { hi: 'किसान', kn: 'ರೈತ', ta: 'விவசாயி', te: 'రైతు', ml: 'കർഷകൻ', mr: 'शेतकरी', bn: 'কৃষক' },
+    'Buyer': { hi: 'क्रेता', kn: 'ಖರೀದಿದಾರ', ta: 'வாங்குபவர்', te: 'కొనుగోలుదారు', ml: 'വാങ്ങുന്നയാൾ', mr: 'खरेदीदार', bn: 'ক্রেতা' },
+    'Transporter': { hi: 'ट्रांसपोर्टर', kn: 'ಸಾರಿಗೆದಾರ', ta: 'போக்குவரத்து', te: 'రవాణాదారు', ml: 'ലോജിസ്റ്റിക്സ്', mr: 'वाहतूकदार', bn: 'পরিবহনকারী' },
+    'Admin': { hi: 'एडमिन', kn: 'ಆಡಳಿತ', ta: 'நிர்வாகி', te: 'అడ్మిన్', ml: 'അഡ്മിൻ', mr: 'प्रशासक', bn: 'অ্যাডমিন' },
+    'Seller': { hi: 'विक्रेता', kn: 'ಮಾರಾಟಗಾರ', ta: 'விற்பனையாளர்', te: 'విక్రేత', ml: 'വിൽപ്പനക്കാരൻ', mr: 'विक्रेता', bn: 'বিক্রেता' },
+    'Rate': { hi: 'दर / भाव', kn: 'ದರ', ta: 'விலை', te: 'ధర', ml: 'നിരക്ക്', mr: 'दर', bn: 'দর' },
+    'Price': { hi: 'मूल्य', kn: 'ಬೆಲೆ', ta: 'விலை', te: 'ధర', ml: 'വില', mr: 'किंमत', bn: 'মূল্য' },
+    'Quantity': { hi: 'मात्रा', kn: 'ಪ್ರಮಾಣ', ta: 'அளவு', te: 'పరిమాణం', ml: 'അളവ്', mr: 'प्रमाण', bn: 'পরিমাণ' },
+    'Moisture': { hi: 'नमी', kn: 'ತೇವಾಂಶ', ta: 'ஈரப்பதம்', te: 'తేమ', ml: 'ഈർപ്പം', mr: 'ओलावा', bn: 'আর্দ্রতা' },
+    'Location': { hi: 'स्थान', kn: 'ಸ್ಥಳ', ta: 'இடம்', te: 'స్థానం', ml: 'സ്ഥലം', mr: 'स्थान', bn: 'অবস্থান' },
+    'Distance': { hi: 'दूरी', kn: 'ದೂರ', ta: 'தூரம்', te: 'దూరం', ml: 'ദൂരം', mr: 'अंतर', bn: 'দূরত্ব' },
+    'Weight': { hi: 'वजन', kn: 'ತೂಕ', ta: 'எடை', te: 'బరువు', ml: 'ഭാരം', mr: 'वजन', bn: 'ওজন' },
+    'Total': { hi: 'कुल', kn: 'ಒಟ್ಟು', ta: 'மொத்தம்', te: 'మొత్తం', ml: 'ആകെ', mr: 'एकूण', bn: 'মোট' },
+    'Status': { hi: 'स्थिति', kn: 'ಸ್ಥಿತಿ', ta: 'நிலை', te: 'స్థితి', ml: 'നില', mr: 'स्थिती', bn: 'অবস্থা' },
+    'Actions': { hi: 'कार्रवाई', kn: 'ಕ್ರಿಯೆಗಳು', ta: 'செயல்கள்', te: 'చర్యలు', ml: 'നടപടികൾ', mr: 'कृती', bn: 'পদক্ষেপ' },
+    'View Details': { hi: 'विवरण देखें', kn: 'ವಿವರಗಳನ್ನು ನೋಡಿ', ta: 'விவரங்களைப் பார்க்கவும்', te: 'ವಿవరాలు చూడండి', ml: 'വിവരങ്ങൾ കാണുക', mr: 'तपशील पहा', bn: 'বিস্তারিত দেখুন' },
+    'Back': { hi: 'वापस', kn: 'ಹಿಂದೆ', ta: 'பின்செல்', te: 'వెనుకకు', ml: 'തിരികെ', mr: 'मागे', bn: 'পিছনে' },
+    'Close': { hi: 'बंद करें', kn: 'ಮುಚ್ಚಿ', ta: 'மூடு', te: 'మూసివేయి', ml: 'അടയ്ക്കുക', mr: 'बंद करा', bn: 'বন্ধ করুন' },
+    'Cancel': { hi: 'रद्द करें', kn: 'ರದ್ದುಮಾಡಿ', ta: 'ரத்து செய்', te: 'రద్దు చేయి', ml: 'റദ്ദാക്കുക', mr: 'रद्द करा', bn: 'বাতিল করুন' },
+    'Save': { hi: 'सहेजें', kn: 'ಉಳಿಸಿ', ta: 'சேமி', te: 'భద్రపరచు', ml: 'സേവ് ചെയ്യുക', mr: 'जतन करा', bn: 'সংরক্ষণ করুন' },
+    'Submit': { hi: 'जमा करें', kn: 'ಸಲ್ಲಿಸಿ', ta: 'சமர்ப்பி', te: 'సమర్పించండి', ml: 'സമർപ്പിക്കുക', mr: 'सादर करा', bn: 'জমা দিন' },
+    'Delete': { hi: 'हटाएं', kn: 'ಅಳಿಸಿ', ta: 'நீக்கு', te: 'తొలగించు', ml: 'ഡിലീറ്റ് ചെയ്യുക', mr: 'हटवा', bn: 'মুছুন' },
+    'Edit': { hi: 'संपादित करें', kn: 'ತಿದ್ದುಪಡಿ', ta: 'திருத்து', te: 'ಸವరించు', ml: 'എഡിറ്റ് ചെയ്യുക', mr: 'संपादित करा', bn: 'সম্পাদনা' },
+    'Download': { hi: 'डाउनलोड करें', kn: 'ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ', ta: 'பதிவிறக்கு', te: 'డౌన్‌లోడ్ చేయండి', ml: 'ഡൗൺലോഡ് ചെയ്യുക', mr: 'डाउनलोड करा', bn: 'ডাউনলোড করুন' },
+    'Upload': { hi: 'अपलोड करें', kn: 'ಅಪ್‌ಲೋಡ್ ಮಾಡಿ', ta: 'பதிவேற்று', te: 'అప్‌లోడ్ చేయండి', ml: 'അപ്‌ലോഡ് ചെയ്യുക', mr: 'अपलोड करा', bn: 'আপলোড করুন' },
+    'Negotiate': { hi: 'बातचीत करें', kn: 'ಚರ್ಚಿಸಿ', ta: 'பேச்சுவார்த்தை', te: 'చర్చించండి', ml: 'സംസാരിക്കുക', mr: 'चर्चा करा', bn: 'আলোচনা করুন' },
+    'Make Offer': { hi: 'प्रस्ताव दें', kn: 'ಪ್ರಸ್ತಾಪ ನೀಡಿ', ta: 'சலுகை அளி', te: 'ఆఫర్ ఇవ్వండి', ml: 'ഓഫർ നൽകുക', mr: 'ऑफर द्या', bn: 'অফার দিন' },
+    'Book Order': { hi: 'ऑर्डर बुक करें', kn: 'ಆರ್ಡರ್ ಬುಕ್ ಮಾಡಿ', ta: 'ஆர்டர் பதிவு செய்', te: 'ఆర్డర్ బుక్ చేయండి', ml: 'ഓർഡർ ബുക്ക് ചെയ്യുക', mr: 'ऑर्डर बुक करा', bn: 'অর্ডার বুক করুন' },
+    'Track Order': { hi: 'ऑर्डर ट्रैक करें', kn: 'ಆರ್ಡರ್ ಟ್ರ್ಯಾಕ್ ಮಾಡಿ', ta: 'ஆர்டரை கண்காணிக்கவும்', te: 'ఆర్డర్ ట్రాక్ చేయండి', ml: 'ഓർഡർ ട്രാക്ക് ചെയ്യുക', mr: 'ऑर्डर ट्रॅक करा', bn: 'অর্ডার ট্র্যাক করুন' },
+    'Verified Farmer': { hi: 'सत्यापित किसान', kn: 'ಪರಿಶೀಲಿಸಿದ ರೈತ', ta: 'சரிபார்க்கப்பட்ட விவசாயி', te: 'ధృవీకరించబడిన రైతు', ml: 'സ്ഥിരീകരിച്ച കർഷകൻ', mr: 'सत्यापित शेतकरी', bn: 'যাচাইকৃত কৃষক' },
+    'Verified Buyer': { hi: 'सत्यापित क्रेता', kn: 'ಪರಿಶೀಲಿಸಿದ ಖರೀದಿದಾರ', ta: 'சரிபார்க்கப்பட்ட வாங்குபவர்', te: 'ధృవీకరించబడిన కొనుగోలుదారు', ml: 'സ്ഥിരീകരിച്ച ഉപഭോക്താവ്', mr: 'सत्यापित खरेदीदार', bn: 'যাচাইকৃত ক্রেতা' },
+    'Verified Transporter': { hi: 'सत्यापित ट्रांसपोर्टर', kn: 'ಪರಿಶೀಲಿಸಿದ ಸಾರಿಗೆದಾರ', ta: 'சரிபார்க்கப்பட்ட போக்குவரத்து', te: 'ధృవీకరించబడిన రవాణాదారు', ml: 'സ്ഥിരീകരിച്ച ലോജിസ്റ്റിക്സ്', mr: 'सत्यापित वाहतूकदार', bn: 'যাচাইকৃত পরিবহনকারী' },
+    'Escrow Locked': { hi: 'एस्क्रो में लॉक', kn: 'ಎಸ್ಕ್ರೋ ಲಾಕ್ ಆಗಿದೆ', ta: 'எஸ்க்ரோவில் பூட்டப்பட்டது', te: 'ఎస్క్రో లాక్ చేయబడింది', ml: 'എസ്ക്രോയിൽ ലോക്ക് ചെയ്തു', mr: 'एस्क्रो खात्यात लॉक', bn: 'এসক্রোতে লক করা' },
+    'Payment Released': { hi: 'भुगतान जारी किया गया', kn: 'ಪಾವತಿ ಬಿಡುಗಡೆಯಾಗಿದೆ', ta: 'பணம் செலுத்தப்பட்டது', te: 'చెల్లింపు విడుదల చేయబడింది', ml: 'പണം വിതരണം ചെയ്തു', mr: 'पेमेंट जमा केले', bn: 'পেমেন্ট প্রদান করা হয়েছে' },
+
+    'Available Biomass Feedstock': { hi: 'उपलब्ध बायोमास सामग्री', kn: 'ಲಭ್ಯವಿರುವ ಜೈವಿಕ ಕಚ್ಚಾವಸ್ತು', ta: 'கிடைக்கும் உயிரி எரிபொருள்', te: 'అందుబాటులో ఉన్న బయోమాస్', ml: 'ലഭ്യമായ ബയോമാസ്', mr: 'उपलब्ध बायोमास', bn: 'উপলব্ধ বায়োমাস' },
+    'Pending Inquiries': { hi: 'लंबित पूछताछ', kn: 'ಬಾಕಿ ಇರುವ ವಿಚಾರಣೆಗಳು', ta: 'நிலுவையில் உள்ள விசாரணைகள்', te: 'పెండింగ్ విచారణలు', ml: 'തീർപ്പുകൽപ്പിക്കാത്ത അന്വേഷണങ്ങൾ', mr: 'प्रलंबित चौकशी', bn: 'বিচারাধীন অনুসন্ধান' },
+    'Avg Price / Ton': { hi: 'औसत मूल्य / टन', kn: 'ಸರಾಸರಿ ದರ / ಟನ್', ta: 'சராசரி விலை / டன்', te: 'సగటు ధర / టన్ను', ml: 'ശരാശരി വില / ടൺ', mr: 'सरासरी दर / टन', bn: 'গড় মূল্য / টন' },
+    'Live 100 km Radius Network': { hi: 'लाइव 100 किमी रेडियस नेटवर्क', kn: 'ಲೈವ್ 100 ಕಿಮೀ ವ್ಯಾಪ್ತಿ ಜಾಲ', ta: 'நேரடி 100 கிமீ சுற்றளவு வலைப்பின்னல்', te: 'లైవ్ 100 కిమీ నెట్‌వర్క్', ml: '100 കിമീ ശൃംഖല', mr: 'थेट १०० किमी परिसर नेटवर्क', bn: 'লাইভ ১০০ কিমি ব্যাসার্ধ নেটওয়ার্ক' },
+    'Procurement Spend': { hi: 'खरीद खर्च', kn: 'ಖರೀದಿ ವೆಚ್ಚ', ta: 'கொள்முதல் செலவு', te: 'సేకరణ ఖర్చు', ml: 'സംഭരണ ചെലവ്', mr: 'खरेदी खर्च', bn: 'সংগ্রহ ব্যয়' },
+    'Escrow Vault Balance': { hi: 'एस्क्रो वॉल्ट बैलेंस', kn: 'ಎಸ್ಕ್ರೋ ವಾಲ್ಟ್ ಬ್ಯಾಲೆನ್ಸ್', ta: 'எஸ்க்ரோ இருப்பு', te: 'ఎస్క్రో వాల్ట్ బ్యాలెన్స్', ml: 'എസ്ക്രോ ബാലൻസ്', mr: 'एस्क्रो खात्यातील शिल्लक', bn: 'এসক্রো ভল্ট ব্যালেন্স' },
+    'Consignment Orders & Fulfillment': { hi: 'कंसाइनमेंट ऑर्डर्स और डिलीवरी', kn: 'ಆದೇಶಗಳು ಮತ್ತು ಸಾಗಣೆ ಪೂರ್ಣಗೊಳಿಸುವಿಕೆ', ta: 'ஆர்டர்கள் மற்றும் நிறைவேற்றம்', te: 'ఆర్డర్లు మరియు నెరవేర్పు', ml: 'ഓർഡറുകളും വിതരണവും', mr: 'ऑर्डर्स आणि पूर्तता', bn: 'অর্ডার এবং বিতরণ' },
+    'Total Consignments': { hi: 'कुल ऑर्डर्स / खेप', kn: 'ಒಟ್ಟು ಸಾಗಣೆಗಳು', ta: 'மொத்த சரக்குகள்', te: 'మొత్తం ఆర్డర్లు', ml: 'ആകെ കൺസൈൻമെന്റുകൾ', mr: 'एकूण ऑर्डर्स', bn: 'মোট অর্ডার' },
+    'Buyer-Paid 3PL Freight': { hi: 'क्रेता द्वारा प्रदत्त 3PL भाड़ा', kn: 'ಖರೀದಿದಾರ ಪಾವತಿಸಿದ ಸಾರಿಗೆ ವೆಚ್ಚ', ta: 'வாங்குபவர் செலுத்திய வாடகை', te: 'కొనుగోలుదారు చెల్లించిన రవాణా ఖర్చు', ml: 'വാങ്ങുന്നയാൾ നൽകിയ ചരക്കുകൂലി', mr: 'खरेदीदाराने दिलेले वाहतूक भाडे', bn: 'ক্রেতা প্রদত্ত পরিবহন ব্যয়' },
+    'Escrow Vault Held': { hi: 'एस्क्रो वॉल्ट में सुरक्षित राशि', kn: 'ಎಸ್ಕ್ರೋ ವಾಲ್ಟ್‌ನಲ್ಲಿ ಕಾಯ್ದಿರಿಸಿದ ಮೊತ್ತ', ta: 'எஸ்க்ரோவில் உள்ள தொகை', te: 'ఎస్క్రో వాల్ట్‌లో ఉన్న నిధులు', ml: 'എസ്ക്രോ തുക', mr: 'एस्क्रो खात्यात अडकवलेली रक्कम', bn: 'এসক্রো ভল্টে রক্ষিত অর্থ' },
+
+    // Financial & Payment Terms
+    'Material Cost': { hi: 'फसल सामग्री मूल्य', kn: 'ವಸ್ತು ವೆಚ್ಚ', ta: 'பொருட்களின் விலை', te: 'పదార్థ ఖర్చు', ml: 'സാധന വില', mr: 'मालाची किंमत', bn: 'পণ্যের মূল্য' },
+    'Transportation Cost (3PL)': { hi: 'परिवहन भाड़ा (3PL)', kn: 'ಸಾರಿಗೆ ವೆಚ್ಚ (3PL)', ta: 'போக்குவரத்து கட்டணம் (3PL)', te: 'రవాణా ఖర్చు (3PL)', ml: 'ഗതാഗത ചാർജ്ജ് (3PL)', mr: 'वाहतूक खर्च (3PL)', bn: 'পরিবহন ব্যয় (3PL)' },
+    '3PL Freight:': { hi: '3PL भाड़ा:', kn: '3PL ಸಾರಿಗೆ ವೆಚ್ಚ:', ta: '3PL வாடகை:', te: '3PL రవాణా:', ml: '3PL വാടക:', mr: '3PL भाडे:', bn: '3PL ভাড়া:' },
+    'Material:': { hi: 'सामग्री:', kn: 'ವಸ್ತು:', ta: 'பொருள்:', te: 'పదార్థం:', ml: 'സാധനം:', mr: 'माल:', bn: 'পণ্য:' },
+    'Total:': { hi: 'कुल योग:', kn: 'ಒಟ್ಟು:', ta: 'மொத்தம்:', te: 'మొత్తం:', ml: 'ആകെ:', mr: 'एकूण:', bn: 'মোট:' },
+    'AgriMech Platform Commission': { hi: 'एग्रीमेक प्लेटफॉर्म कमीशन', kn: 'ಅಗ್ರಿಮೆಕ್ ಕಮಿಷನ್', ta: 'அக்ரிமெக் கட்டணம்', te: 'అగ్రిమెక్ కమీషన్', ml: 'അഗ്രിമെക്ക് കമ്മീഷൻ', mr: 'एग्रीमेक कमिशन', bn: 'এগ্রিম্যাক কমিশন' },
+    'Final Payable Amount': { hi: 'कुल देय राशि', kn: 'ಒಟ್ಟು ಪಾವತಿಸಬೇಕಾದ ಮೊತ್ತ', ta: 'மொத்த தொகை', te: 'మొత్తం చెల్లించవలసినది', ml: 'ആകെ തുക', mr: 'एकूण देय रक्कम', bn: 'মোট প্রদেয় অর্থ' },
+    'Held in AgriPay Trust Escrow Vault': { hi: 'एग्रीपे ट्रस्ट एस्क्रो वॉल्ट में सुरक्षित', kn: 'ಎಸ್ಕ್ರೋ ವಾಲ್ಟ್‌ನಲ್ಲಿ ಸುರಕ್ಷಿತ', ta: 'எஸ்க்ரோவில் பூட்டப்பட்டுள்ளது', te: 'ఎస్క్రో వాల్ట్‌లో భద్రపరచబడింది', ml: 'എസ്ക്രോയിൽ സൂക്ഷിച്ചിരിക്കുന്നു', mr: 'एस्क्रो खात्यात सुरक्षित', bn: 'এসক্রো ভল্টে সুরক্ষিত' },
+    'Buyer Pays 100% Transport • Farmer ₹0': {
+      hi: 'क्रेता 100% भाड़ा वहन करेगा • किसान ₹0',
+      kn: 'ಖರೀದಿದಾರ 100% ಸಾರಿಗೆ ವೆಚ್ಚ ಪಾವತಿಸುತ್ತಾನೆ • ರೈತರಿಗೆ ₹0',
+      ta: 'வாங்குபவர் 100% வாடகை செலுத்துகிறார் • விவசாயி ₹0',
+      te: 'కొనుగోలుదారు 100% రవాణా ఖర్చు చెల్లిస్తాడు • రైతుకు ₹0',
+      ml: 'വാങ്ങുന്നയാൾ 100% ചരക്കുകൂലി നൽകുന്നു • കർഷകന് ₹0',
+      mr: 'खरेदीदार १००% वाहतूक खर्च देईल • शेतकरी ₹०',
+      bn: 'ক্রেতা ১০০% পরিবহন ব্যয় বহন করবে • কৃষক ₹০'
+    },
+
+    // Buttons & Interactive Actions
+    'List Residue': { hi: 'अवशेष लिस्ट करें', kn: 'ದಾಸ್ತಾನು ಸೇರಿಸಿ', ta: 'வைக்கோல் பட்டியலிடு', te: 'వ్యర్థాలను లిస్ట్ చేయండి', ml: 'ലിസ്റ്റ് ചെയ്യുക', mr: 'अवशेष नोंदवा', bn: 'তালিকাভুক্ত করুন' },
+    'Search Feedstock': { hi: 'बायोमास खोजें', kn: 'ಹುಡುಕಾಟ', ta: 'தேடல்', te: 'శోధించండి', ml: 'തിരയുക', mr: 'शोध घ्या', bn: 'অনুসন্ধান' },
+    'Reserve 24h Hold': { hi: '24 घंटे स्टॉक होल्ड करें', kn: '24 ಗಂಟೆ ಕಾಯ್ದಿರಿಸಿ', ta: '24 மணிநேர முன்பதிவு', te: '24 గంటలు రిజర్వ్ చేయండి', ml: '24 മണിക്കൂർ റിസർവ് ചെയ്യുക', mr: '२४ तास राखीव ठेवा', bn: '২৪ ঘণ্টা রিজার্ভ করুন' },
+    'Accept Offer': { hi: 'प्रस्ताव स्वीकार करें', kn: 'ಪ್ರಸ್ತಾಪ ಒಪ್ಪಿಕೊಳ್ಳಿ', ta: 'ஏற்றுக்கொள்', te: 'ఆమోదించండి', ml: 'സ്വീകരിക്കുക', mr: 'स्वीकारा', bn: 'গ্রহণ করুন' },
+    'Reject': { hi: 'अस्वीकार करें', kn: 'ತಿರಸ್ಕರಿಸಿ', ta: 'நிராகரி', te: 'తిరస్కరించండి', ml: 'നിരസിക്കുക', mr: 'नाकारा', bn: 'প্রত্যাখ্যান' },
+    'Counter Offer': { hi: 'काउंटर ऑफर दें', kn: 'ಪ್ರತಿದರ ನೀಡಿ', ta: 'மாற்று சலுகை', te: 'కౌంటర్ ఆఫర్', ml: 'മറുപടി ഓഫർ', mr: 'पर्यायी ऑफर', bn: 'পাল্টা অফার' },
+    'Send': { hi: 'भेजें', kn: 'ಕಳುಹಿಸಿ', ta: 'அனுப்பு', te: 'పంపు', ml: 'അയക്കുക', mr: 'पाठवा', bn: 'পাঠান' },
+    'Pay with AgriPay': { hi: 'एग्रीपे द्वारा भुगतान करें', kn: 'ಅಗ್ರಿಪೇ ಮೂಲಕ ಪಾವತಿಸಿ', ta: 'அக்ரிபே மூலம் பணம் செலுத்துங்கள்', te: 'అగ్రిపే ద్వారా చెల్లించండి', ml: 'അഗ്രിപേ വഴി പണമടയ്ക്കുക', mr: 'एग्रीपे द्वारे पैसे भरा', bn: 'এগ্রিপে দিয়ে অর্থ প্রদান করুন' },
+    'Approve & Lock Freight': { hi: 'भाड़ा स्वीकृत और लॉक करें', kn: 'ಸಾರಿಗೆ ದರ ಲಾಕ್ ಮಾಡಿ', ta: 'வாடகையை உறுதிப்படுத்து', te: 'రవాణా ధర లాక్ చేయండి', ml: 'വാടക നിരക്ക് ലോക്ക് ചെയ്യുക', mr: 'भाडे निश्चित करा', bn: 'ভাড়া অনুমোদন করুন' },
+    'Verify POD': { hi: 'धर्मकांटा स्लिप वेरीफाई करें', kn: 'ತೂಕದ ರಶೀದಿ ಪರಿಶೀಲಿಸಿ', ta: 'எடை சீட்டை சரிபார்க்கவும்', te: 'వేబ్రిడ్జి స్లిప్ ధృవీకరించండి', ml: 'തൂക്ക രസീത് പരിശോധിക്കുക', mr: 'वजन पावती तपासा', bn: 'ওজন রসিদ যাচাই করুন' },
+    'Track': { hi: 'ट्रैक करें', kn: 'ಟ್ರ್ಯಾಕ್ ಮಾಡಿ', ta: 'கண்காணிக்கவும்', te: 'ట్రాక్ చేయండి', ml: 'ട്രാക്ക് ചെയ്യുക', mr: 'ट्रॅक करा', bn: 'ট্র্যাক করুন' },
+    'Certificate': { hi: 'प्रमाणपत्र', kn: 'ಪ್ರಮಾಣಪತ್ರ', ta: 'சான்றிதழ்', te: 'సర్టిఫికేట్', ml: 'സർട്ടിഫിക്കറ്റ്', mr: 'प्रमाणपत्र', bn: 'শংসাপত্র' },
+    'AgriPay Receipt': { hi: 'एग्रीपे रसीद', kn: 'ಅಗ್ರಿಪೇ ರಸೀದಿ', ta: 'அக்ரிபே ரசீது', te: 'అగ్రిపే రసీదు', ml: 'അഗ്രിപേ രസീത്', mr: 'एग्रीपे पावती', bn: 'এগ্রিপে রসিদ' },
+    'Show Original': { hi: 'मूल संदेश देखें', kn: 'ಮೂಲ ಸಂದೇಶ', ta: 'அசல் செய்தி', te: 'అసలు సందేశం', ml: 'യഥാർത്ഥ സന്ദേശം', mr: 'मूळ संदेश', bn: 'আসল বার্তা' },
+    'Show Translation': { hi: 'अनुवाद देखें', kn: 'ಅನುವಾದ ನೋಡಿ', ta: 'மொழிபெயர்ப்பு', te: 'అనువాదం', ml: 'വിവർത്തനം', mr: 'भाषांतर पहा', bn: 'অনুবাদ দেখুন' },
+    'Custom Price Offer': { hi: 'कस्टम मूल्य प्रस्ताव', kn: 'ವಿಶೇಷ ಬೆಲೆ ಪ್ರಸ್ತಾಪ', ta: 'விருப்ப விலை சலுகை', te: 'ప్రత్యేక ధర ఆఫర్', ml: 'കസ്റ്റം വില ഓഫർ', mr: 'सानुकूल दर ऑफर', bn: 'কাস্টম মূল্য প্রস্তাব' },
+
+    // Status Badges & Table Headers
+    'Order Placed': { hi: 'ऑर्डर दर्ज', kn: 'ಆದೇಶ ನೀಡಲಾಗಿದೆ', ta: 'ஆர்டர் செய்யப்பட்டது', te: 'ఆర్డర్ చేయబడింది', ml: 'ഓർഡർ നൽകി', mr: 'मागणी नोंदवली', bn: 'অর্ডার দেওয়া হয়েছে' },
+    'In Transit': { hi: 'मार्ग में (ट्रांजिट)', kn: 'ಸಾಗಣೆಯಲ್ಲಿದೆ', ta: 'வழியில் உள்ளது', te: 'రవాణాలో ఉంది', ml: 'യാത്രയിൽ', mr: 'मार्गावर आहे', bn: 'পথে আছে' },
+    'Delivered': { hi: 'वितरित (डिलीवर्ड)', kn: 'ತಲುಪಿಸಲಾಗಿದೆ', ta: 'விநியோகிக்கப்பட்டது', te: 'డెలివరీ చేయబడింది', ml: 'വിതരണം ചെയ്തു', mr: 'पोहोचवले', bn: 'বিতরণ সম্পন্ন' },
+    'All Consignments': { hi: 'सभी ऑर्डर्स', kn: 'ಎಲ್ಲಾ ಸಾಗಣೆಗಳು', ta: 'அனைத்து ஆர்டர்களும்', te: 'అన్ని ఆర్డర్లు', ml: 'എല്ലാ ഓർഡറുകളും', mr: 'सर्व ऑर्डर्स', bn: 'সমস্ত অর্ডার' },
+    'In Transit & Dispatched': { hi: 'रवाना एवं मार्ग में', kn: 'ಹೊರಟಿದೆ ಮತ್ತು ಸಾಗಣೆಯಲ್ಲಿದೆ', ta: 'அனுப்பப்பட்டு வழியில் உள்ளது', te: 'బయలుదేరి రవాణాలో ఉంది', ml: 'യാത്രയിലുള്ളവ', mr: 'रवाना झालेले व मार्गावर', bn: 'প্রেরিত ও পথে রয়েছে' },
+    'Delivered & Settled': { hi: 'सफलतापूर्वक प्राप्त एवं चुकता', kn: 'ತಲುಪಿಸಲಾಗಿದೆ ಮತ್ತು ಇತ್ಯರ್ಥವಾಗಿದೆ', ta: 'விநியோகிக்கப்பட்டு முடிக்கப்பட்டது', te: 'డెలివరీ చేయబడి పూర్తయింది', ml: 'പൂർത്തിയായവ', mr: 'पोहोचवले व हिशोब पूर्ण', bn: 'বিতরণ ও নিষ্পত্তি সম্পন্ন' },
+    'Weighbridge Passed': { hi: 'धर्मकांटा वजन स्वीकृत', kn: 'ತೂಕ ತಪಾಸಣೆ ಯಶಸ್ವಿ', ta: 'எடை சோதனை தேர்ச்சி', te: 'వేబ్రిడ్జి తనిఖీ పూర్తయింది', ml: 'തൂക്കം പരിശോധിച്ചു', mr: 'वजन तपासणी मंजूर', bn: 'ওজন পরীক্ষা সফল' },
+    '100% Settled': { hi: '100% भुगतान चुकता', kn: '100% ಇತ್ಯರ್ಥವಾಗಿದೆ', ta: '100% தீர்க்கப்பட்டது', te: '100% చెల్లించబడింది', ml: '100% വിതരണം ചെയ്തു', mr: '१००% हिशोब पूर्ण', bn: '১০০% নিষ্পত্তি হয়েছে' },
+
+    // Chatbot UI Strings
+    'chatbot.title': { hi: 'एग्री-मित्र AI सहायक', kn: 'ಅಗ್ರಿ-ಮಿತ್ರ AI ಸಹಾಯಕ', ta: 'அக்ரி-மித்ரா AI உதவியாளர்', te: 'అగ్రి-మిత్ర AI సహాయకుడు', ml: 'അഗ്രി-മിത്ര AI സഹായി', mr: 'एग्री-मित्र AI सहाय्यक', bn: 'এগ্রি-মিত্র AI সহায়ক' },
+    'chatbot.subtitle': { hi: '24/7 कृषि अवशेष एवं लॉजिस्टिक्स सलाहकार', kn: '24/7 ಕೃಷಿ ತ್ಯಾಜ್ಯ ಮತ್ತು ಸಾರಿಗೆ ಸಲಹೆಗಾರ', ta: '24/7 விவசாயக் கழிவு & போக்குவரத்து ஆலோசகர்', te: '24/7 వ్యవసాయ వ్యర్థాలు & రవాణా సలహాదారు', ml: '24/7 ഉപദേശകൻ', mr: '२४/७ कृषी अवशेष व वाहतूक सल्लागार', bn: '২৪/৭ কৃষি অবশিষ্টাংশ ও পরিবহন উপদেষ্টা' },
+    'chatbot.placeholder': { hi: 'यहाँ अपना प्रश्न पूछें...', kn: 'ನಿಮ್ಮ ಪ್ರಶ್ನೆಯನ್ನು ಇಲ್ಲಿ ಟೈಪ್ ಮಾಡಿ...', ta: 'உங்கள் கேள்வியை இங்கே தட்டச்சு செய்யவும்...', te: 'మీ ప్రశ్నను ఇక్కడ అడగండి...', ml: 'ചോദ്യം ഇവിടെ ചോദിക്കുക...', mr: 'येथे आपला प्रश्न विचारा...', bn: 'এখানে আপনার প্রশ্ন জিজ্ঞাসা করুন...' }
+  };
+
+  constructor() {
+    this.restoreLanguage();
+    this.setupRouterListener();
+  }
+
+  private restoreLanguage(): void {
+    const saved = localStorage.getItem('agrimech_language') as I18nLanguage | null;
+    if (saved && this.languages.some(l => l.code === saved)) {
+      this.currentLanguage.set(saved);
+    }
+    const savedChat = localStorage.getItem('agrimech_chat_language') as I18nLanguage | null;
+    if (savedChat && this.languages.some(l => l.code === savedChat)) {
+      this.chatLanguage.set(savedChat);
+    }
+
+    // Auto-trigger DOM translation on initial boot if language is non-English
+    setTimeout(() => {
+      if (this.currentLanguage() !== 'en') {
+        this.translateEntirePage(this.currentLanguage());
+      }
+    }, 400);
+  }
+
+  private setupRouterListener(): void {
+    // Whenever navigation completes, re-translate newly rendered page content
+    this.router.events.subscribe(event => {
+      if (event instanceof NavigationEnd) {
+        setTimeout(() => {
+          if (this.currentLanguage() !== 'en') {
+            this.translateEntirePage(this.currentLanguage());
+          }
+        }, 150);
+      }
+    });
+  }
+
+  setLanguage(lang: I18nLanguage): void {
+    this.currentLanguage.set(lang);
+    localStorage.setItem('agrimech_language', lang);
+    this.syncWithBackend(lang, this.chatLanguage());
+
+    // Immediately translate the entire application DOM
+    this.translateEntirePage(lang);
+  }
+
+  setChatLanguage(lang: I18nLanguage): void {
+    this.chatLanguage.set(lang);
+    localStorage.setItem('agrimech_chat_language', lang);
+    this.syncWithBackend(this.currentLanguage(), lang);
+  }
+
+  private syncWithBackend(preferredLanguage: I18nLanguage, chatLanguage: I18nLanguage): void {
+    const token = localStorage.getItem('agrimech_token');
+    if (!token) return;
+
+    this.http.post(`${this.apiBase}/auth/update-language`, { preferredLanguage, chatLanguage }, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).subscribe({
+      next: () => {},
+      error: () => {}
+    });
+  }
+
+  /**
+   * Translate a UI text key or phrase with fallback
+   */
+  t(key: string, fallback?: string): string {
+    const current = this.currentLanguage();
+
+    // Check direct phrase dictionary
+    if (this.phraseDictionary[key] && this.phraseDictionary[key][current]) {
+      return this.phraseDictionary[key][current]!;
+    }
+
+    return fallback || key;
+  }
+
+  /**
+   * Translates an arbitrary English phrase into the requested language
+   */
+  translatePhrase(phrase: string, targetLang?: I18nLanguage): string {
+    const lang = targetLang || this.currentLanguage();
+    if (lang === 'en' || !phrase) return phrase;
+
+    const trimmed = phrase.trim();
+
+    // 1. Direct match
+    if (this.phraseDictionary[trimmed] && this.phraseDictionary[trimmed][lang]) {
+      return this.phraseDictionary[trimmed][lang]!;
+    }
+
+    // 2. Case-insensitive match
+    const lower = trimmed.toLowerCase();
+    for (const [k, v] of Object.entries(this.phraseDictionary)) {
+      if (k.toLowerCase() === lower && v[lang]) {
+        return v[lang]!;
+      }
+    }
+
+    // 3. Check with leading/trailing emojis or bullets stripped (e.g. "🌾 Paddy Straw", "• 100% Settled")
+    const emojiMatch = trimmed.match(/^([\uD800-\uDBFF\uDC00-\uDFFF\s•✓★💡⚡🌾🚛🛡️🏭]+)(.*)$/);
+    if (emojiMatch && emojiMatch[2]) {
+      const prefix = emojiMatch[1];
+      const inner = emojiMatch[2].trim();
+      const translatedInner = this.translatePhrase(inner, lang);
+      if (translatedInner !== inner) {
+        return prefix + translatedInner;
+      }
+    }
+
+    // 4. Substring replacement for key terms if string is longer
+    if (trimmed.length > 8) {
+      let result = trimmed;
+      for (const [k, v] of Object.entries(this.phraseDictionary)) {
+        if (k.length >= 5 && v[lang] && result.includes(k)) {
+          result = result.split(k).join(v[lang]!);
+        }
+      }
+      if (result !== trimmed) {
+        return result;
+      }
+    }
+
+    return phrase;
+  }
+
+  /**
+   * Scans and translates all visible text nodes across the entire page DOM
+   */
+  translateEntirePage(targetLang: I18nLanguage): void {
+    if (typeof document === 'undefined') return;
+
+    if (targetLang === 'en') {
+      this.revertDomToEnglish();
+      return;
+    }
+
+    this.walkAndTranslate(document.body, targetLang);
+    this.attachDomObserver(targetLang);
+  }
+
+  /**
+   * Traverses DOM nodes and substitutes text using the phrase dictionary
+   */
+  private walkAndTranslate(root: Node, targetLang: I18nLanguage): void {
+    if (this.isTranslating) return;
+    this.isTranslating = true;
+
+    try {
+      const walker = document.createTreeWalker(
+        root,
+        NodeFilter.SHOW_TEXT,
+        {
+          acceptNode: (node: Node) => {
+            const parent = node.parentElement;
+            if (!parent) return NodeFilter.FILTER_REJECT;
+
+            // Skip script, style, code, input, textarea tags
+            const tag = parent.tagName.toLowerCase();
+            if (['script', 'style', 'code', 'textarea', 'input', 'select'].includes(tag)) {
+              return NodeFilter.FILTER_REJECT;
+            }
+
+            // Skip elements marked explicitly as notranslate
+            if (parent.classList.contains('notranslate') || parent.getAttribute('translate') === 'no') {
+              return NodeFilter.FILTER_REJECT;
+            }
+
+            const val = node.nodeValue?.trim() || '';
+            // Skip empty text or purely numbers/punctuation
+            if (!val || /^[\d\s₹\.,\(\)\-_\/\\:]+$/.test(val)) {
+              return NodeFilter.FILTER_REJECT;
+            }
+
+            return NodeFilter.FILTER_ACCEPT;
+          }
+        }
+      );
+
+      let node: Node | null;
+      while ((node = walker.nextNode())) {
+        // Record original English text if not yet cached
+        if (!this.originalTextMap.has(node)) {
+          this.originalTextMap.set(node, node.nodeValue || '');
+        }
+
+        const original = this.originalTextMap.get(node) || '';
+        const trimmed = original.trim();
+
+        if (trimmed) {
+          const translated = this.translatePhrase(trimmed, targetLang);
+          if (translated !== trimmed) {
+            // Replace while preserving surrounding spaces
+            const leading = original.match(/^\s*/)?.[0] || '';
+            const trailing = original.match(/\s*$/)?.[0] || '';
+            node.nodeValue = leading + translated + trailing;
+          }
+        }
+      }
+    } finally {
+      this.isTranslating = false;
+    }
+  }
+
+  /**
+   * Reverts all previously translated DOM nodes back to their pristine English originals
+   */
+  private revertDomToEnglish(): void {
+    if (typeof document === 'undefined') return;
+
+    if (this.domObserver) {
+      this.domObserver.disconnect();
+      this.domObserver = null;
+    }
+
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let node: Node | null;
+    while ((node = walker.nextNode())) {
+      if (this.originalTextMap.has(node)) {
+        node.nodeValue = this.originalTextMap.get(node)!;
+      }
+    }
+  }
+
+  /**
+   * Attaches a MutationObserver to continuously translate dynamically rendered components
+   */
+  private attachDomObserver(targetLang: I18nLanguage): void {
+    if (typeof document === 'undefined') return;
+
+    if (this.domObserver) {
+      this.domObserver.disconnect();
+    }
+
+    this.domObserver = new MutationObserver(mutations => {
+      for (const m of mutations) {
+        if (m.type === 'childList') {
+          m.addedNodes.forEach(added => {
+            if (added.nodeType === Node.ELEMENT_NODE) {
+              this.walkAndTranslate(added, targetLang);
+            }
+          });
+        }
+      }
+    });
+
+    this.domObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  /**
+   * Translate text across all 8 Indian languages simultaneously via backend
+   */
+  async translateFullMessage(text: string): Promise<{ detectedLanguage: string; translations: Record<string, string> }> {
+    try {
+      const res = await this.http.post<{ success: boolean; data: any }>(`${this.apiBase}/translate/translate`, {
+        text,
+        sourceLang: undefined
+      }).toPromise();
+
+      if (res && res.data) {
+        return {
+          detectedLanguage: res.data.detectedLanguage || 'en',
+          translations: res.data.translations || {}
+        };
+      }
+    } catch {
+      // Fallback
+    }
+
+    return {
+      detectedLanguage: 'en',
+      translations: { en: text }
+    };
+  }
+}

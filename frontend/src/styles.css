@@ -1,0 +1,304 @@
+/* =========================================================================
+   AGRIMACH — B2B AGRICULTURAL RESIDUE & BIO-ENERGY MARKETPLACE
+   Earth-Grounded Farmer & Bio-Industrial Design System
+   ========================================================================= */
+
+:root {
+  /* Farmer Coded Warm Earth & Meadow Palette (Light Mode Default) */
+  --background: #FAF8F2;
+  --sidebar-background: #F3ECE0;
+  --card-background: #FFFFFF;
+  --primary-text: #163320;
+  --secondary-text: #5A6D60;
+  --border: #E5DAC4;
+  --hover-background: #ECE3D2;
+
+  /* Primary Agrarian Green & Golden Harvest Accents */
+  --primary-button: #166534;
+  --primary-button-text: #FFFFFF;
+  --primary-button-hover: #14532D;
+  --secondary-button: #FFFFFF;
+  --secondary-button-text: #163320;
+  --secondary-button-border: #D8CCA8;
+
+  --accent-gold: #D97706;
+  --accent-gold-light: #FDE68A;
+  --accent-green: #10B981;
+  --accent-green-light: #D1FAE5;
+  --accent-soil: #78350F;
+
+  --danger-text: #B91C1C;
+  --badge-background: #EFE7D8;
+  --badge-text: #163320;
+  --chip-border: #D8CCA8;
+  --input-background: #FFFFFF;
+  --modal-backdrop: rgba(14, 25, 17, 0.6);
+}
+
+[data-theme="dark"] {
+  /* Midnight Fertile Humus & Deep Pine Canopy (Dark Mode) */
+  --background: #0B140D;
+  --sidebar-background: #111F15;
+  --card-background: #15251A;
+  --primary-text: #F0FDF4;
+  --secondary-text: #96AD9D;
+  --border: #223828;
+  --hover-background: #1D3223;
+
+  --primary-button: #15803D;
+  --primary-button-text: #FFFFFF;
+  --primary-button-hover: #16A34A;
+  --secondary-button: #15251A;
+  --secondary-button-text: #F0FDF4;
+  --secondary-button-border: #2A4432;
+
+  --accent-gold: #F59E0B;
+  --accent-gold-light: #78350F;
+  --accent-green: #22C55E;
+  --accent-green-light: #064E3B;
+  --accent-soil: #92400E;
+
+  --danger-text: #F87171;
+  --badge-background: #1D3223;
+  --badge-text: #A7F3D0;
+  --chip-border: #2F4D38;
+  --input-background: #111F15;
+  --modal-backdrop: rgba(0, 0, 0, 0.78);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--background);
+  background-image:
+    radial-gradient(ellipse at 50% 0%, rgba(217, 119, 6, 0.04) 0%, transparent 65%),
+    radial-gradient(ellipse at 100% 100%, rgba(16, 185, 129, 0.04) 0%, transparent 65%),
+    radial-gradient(ellipse at 0% 50%, rgba(120, 53, 15, 0.02) 0%, transparent 50%);
+  background-attachment: fixed;
+  color: var(--primary-text);
+  line-height: 1.5;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+/* Typography Hierarchy */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--primary-text);
+  font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.font-syne {
+  font-family: 'Syne', sans-serif !important;
+}
+
+.font-outfit {
+  font-family: 'Outfit', sans-serif !important;
+}
+
+.font-jakarta {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+}
+
+p {
+  color: var(--secondary-text);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Form Controls */
+input, select, textarea {
+  font-family: inherit;
+  font-size: 14px;
+  background-color: var(--input-background);
+  color: var(--primary-text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: #10B981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--secondary-text);
+  opacity: 0.75;
+}
+
+/* Buttons */
+button {
+  font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 150ms ease;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #15803D 0%, #166534 100%);
+  color: #FFFFFF;
+  border: 1px solid #16A34A;
+  box-shadow: 0 2px 6px rgba(22, 101, 52, 0.2);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #16A34A 0%, #15803D 100%);
+  box-shadow: 0 4px 12px rgba(22, 101, 52, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background-color: var(--secondary-button);
+  color: var(--secondary-button-text);
+  border: 1px solid var(--secondary-button-border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--hover-background);
+  border-color: var(--border);
+}
+
+.btn-ghost {
+  background-color: transparent;
+  color: var(--primary-text);
+  border: 1px solid transparent;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background-color: var(--hover-background);
+}
+
+.btn-sm {
+  padding: 5px 12px;
+  font-size: 12px;
+  border-radius: 6px;
+}
+
+/* Tables */
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: var(--card-background);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+th {
+  background-color: var(--sidebar-background);
+  color: var(--secondary-text);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--primary-text);
+  font-size: 13px;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+tbody tr:hover {
+  background-color: var(--hover-background);
+}
+
+/* Badges & Pills */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background-color: var(--badge-background);
+  color: var(--badge-text);
+  border: 1px solid var(--border);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #10B981;
+}
+
+.status-dot.secondary {
+  background-color: #F59E0B;
+}
+
+/* Farmer & Factory Aesthetics Utility Classes */
+.farmer-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #047857;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.factory-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #B45309;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

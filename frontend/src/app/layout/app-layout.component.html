@@ -1,0 +1,346 @@
+<!-- If Auth Route (Role selection / Login), render standalone full-screen -->
+<ng-container *ngIf="isAuthRoute(); else mainLayout">
+  <router-outlet></router-outlet>
+</ng-container>
+
+<!-- Main App Layout with ChatGPT-style Sidebar -->
+<ng-template #mainLayout>
+  <div class="layout-wrapper">
+    <!-- Mobile Backdrop -->
+    <div
+      *ngIf="isMobileSidebarOpen()"
+      class="mobile-backdrop"
+      (click)="closeMobileSidebar()"
+    ></div>
+
+    <!-- Sidebar (250px) -->
+    <aside
+      class="sidebar"
+      [class.mobile-open]="isMobileSidebarOpen()"
+    >
+      <!-- Brand Header with Custom Logo -->
+      <div class="sidebar-header">
+        <a routerLink="/" class="brand-link" (click)="closeMobileSidebar()">
+          <app-logo [size]="30" [showText]="true" textSize="md"></app-logo>
+          <span class="role-pill" [ngClass]="'role-' + authService.selectedRole()">
+            {{
+              authService.selectedRole() === 'farmer' ? '🌾 Seller' :
+              authService.selectedRole() === 'transporter' ? '🚛 3PL Fleet' :
+              authService.selectedRole() === 'admin' ? '🛡️ Admin' : '🏭 Buyer'
+            }}
+          </span>
+        </a>
+        <button class="mobile-close-btn" (click)="closeMobileSidebar()" aria-label="Close sidebar">
+          <app-icon name="x" [size]="16"></app-icon>
+        </button>
+      </div>
+
+      <!-- Main Navigation List (Role-Tailored) -->
+      <nav class="sidebar-nav">
+        <!-- If Seller: Show New Listing Button prominently at top -->
+        <a
+          *ngIf="authService.selectedRole() === 'farmer'"
+          routerLink="/new-listing"
+          routerLinkActive="active-link"
+          class="nav-item new-listing-btn"
+          (click)="closeMobileSidebar()"
+        >
+          <app-icon name="plus" [size]="15"></app-icon>
+          <span>New Listing</span>
+        </a>
+
+        <!-- Dynamic Role-Specific Navigation Items -->
+        <a
+          *ngFor="let item of activeNavItems()"
+          [routerLink]="item.route"
+          routerLinkActive="active-link"
+          class="nav-item"
+          (click)="closeMobileSidebar()"
+        >
+          <app-icon [name]="item.icon" [size]="16"></app-icon>
+          <span class="nav-label">{{ item.label }}</span>
+
+          <!-- Notifications Counter -->
+          <span *ngIf="item.route === '/notifications' && notificationService.unreadCount() > 0" class="nav-count">
+            {{ notificationService.unreadCount() }}
+          </span>
+        </a>
+
+        <div class="nav-divider"></div>
+
+        <!-- Role Workspace Switcher Card (4 Roles) -->
+        <div class="role-switcher-card">
+          <div class="role-switch-header">
+            <span class="role-badge-pill">
+              {{
+                authService.selectedRole() === 'farmer' ? '🌾 Farmer / Seller' :
+                authService.selectedRole() === 'transporter' ? '🚛 3PL Transporter' :
+                authService.selectedRole() === 'admin' ? '🛡️ Platform Admin' : '🏭 Industrial Buyer'
+              }}
+            </span>
+            <button class="switch-btn" (click)="switchRole()" title="Cycle operating role">
+              <span>Switch</span>
+            </button>
+          </div>
+          <div class="current-user-name">{{ authService.currentUser()?.name }}</div>
+          <div class="current-org-name">{{ authService.currentUser()?.organization }}</div>
+          <div class="role-quick-strip">
+            <button class="role-mini-pill" [class.active]="authService.selectedRole() === 'farmer'" (click)="switchRoleDirect('farmer')" title="Farmer Mode">🌾 Farmer</button>
+            <button class="role-mini-pill" [class.active]="authService.selectedRole() === 'buyer'" (click)="switchRoleDirect('buyer')" title="Buyer Mode">🏭 Buyer</button>
+            <button class="role-mini-pill" [class.active]="authService.selectedRole() === 'transporter'" (click)="switchRoleDirect('transporter')" title="3PL Transporter Mode">🚛 3PL</button>
+            <button class="role-mini-pill" [class.active]="authService.selectedRole() === 'admin'" (click)="switchRoleDirect('admin')" title="Admin Mode">🛡️ Admin</button>
+          </div>
+        </div>
+      </nav>
+
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
+        <a
+          routerLink="/profile"
+          routerLinkActive="active-link"
+          class="nav-item profile-link"
+          (click)="closeMobileSidebar()"
+        >
+          <app-icon name="user" [size]="16"></app-icon>
+          <span>Profile & Settings</span>
+        </a>
+
+        <div class="footer-bottom-row">
+          <button
+            class="footer-icon-btn logout-btn"
+            (click)="logout()"
+            title="Log out and switch account"
+          >
+            <app-icon name="log-out" [size]="15"></app-icon>
+            <span>Logout</span>
+          </button>
+
+          <button
+            class="footer-icon-btn theme-toggle-btn"
+            (click)="toggleTheme()"
+            [title]="themeService.isDarkMode() ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
+            aria-label="Toggle theme"
+          >
+            <app-icon [name]="themeService.isDarkMode() ? 'sun' : 'moon'" [size]="15"></app-icon>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="main-wrapper">
+      <!-- Top Bar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="mobile-menu-btn" (click)="toggleMobileSidebar()" aria-label="Open menu">
+            <app-icon name="menu" [size]="18"></app-icon>
+          </button>
+          <h1 class="page-title">{{ currentPageTitle() }}</h1>
+        </div>
+
+        <!-- Global Live Proximity Radar Location Bar -->
+        <div class="topbar-location-center">
+          <button class="live-location-badge-btn" (click)="openLocationModal()" title="Change live location or scan live GPS">
+            <span class="live-dot-pulse"></span>
+            <app-icon name="map-pin" [size]="14"></app-icon>
+            <div class="location-label-box">
+              <span class="location-radius-tag">100 KM LIVE RADAR</span>
+              <span class="location-current-name">{{ marketplaceService.currentHub().shortName }}</span>
+            </div>
+            <app-icon name="chevron-down" [size]="12"></app-icon>
+          </button>
+        </div>
+
+        <div class="topbar-right">
+          <!-- Global Multi-Language Selector Dropdown with Globe Icon -->
+          <div class="lang-dropdown-wrapper">
+            <button
+              type="button"
+              class="lang-globe-btn"
+              (click)="toggleLangDropdown()"
+              title="Change Website Language / भाषा बदलें"
+            >
+              <span class="globe-icon-symbol">🌐</span>
+              <span class="lang-code-tag">{{ i18nService.currentLanguage().toUpperCase() }}</span>
+              <app-icon name="chevron-down" [size]="10"></app-icon>
+            </button>
+
+            <!-- Language Menu Dropdown -->
+            <div *ngIf="isLangDropdownOpen()" class="lang-dropdown-menu" (click)="$event.stopPropagation()">
+              <div class="lang-menu-title">Select Language / भाषा चुनें</div>
+              <div class="lang-options-grid">
+                <button
+                  *ngFor="let item of i18nService.languages"
+                  type="button"
+                  class="lang-item-row"
+                  [class.active]="i18nService.currentLanguage() === item.code"
+                  (click)="selectLanguage(item.code)"
+                >
+                  <span class="lang-item-flag">{{ item.flag }}</span>
+                  <div class="lang-item-text">
+                    <span class="lang-item-native">{{ item.nativeName }}</span>
+                    <span class="lang-item-en">({{ item.name }})</span>
+                  </div>
+                  <span *ngIf="i18nService.currentLanguage() === item.code" class="lang-check-tick">✓</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Replay Intro & Sound -->
+          <button class="intro-replay-pill" (click)="replayIntro()" title="Replay AGRIMECH Opening Intro & Harvest Chime">
+            <span class="intro-note-icon">🎵</span>
+            <span class="intro-note-label">Intro</span>
+          </button>
+
+          <!-- Role-Aware Topbar Action -->
+          <a
+            *ngIf="authService.selectedRole() === 'farmer'"
+            routerLink="/new-listing"
+            class="btn-primary btn-sm"
+          >
+            <app-icon name="plus" [size]="13"></app-icon>
+            <span>{{ i18nService.t('btn.listResidue', 'List Residue') }}</span>
+          </a>
+
+          <a
+            *ngIf="authService.selectedRole() === 'buyer'"
+            routerLink="/suppliers"
+            class="btn-primary btn-sm"
+          >
+            <app-icon name="search" [size]="13"></app-icon>
+            <span>{{ i18nService.t('btn.searchFeedstock', 'Search Feedstock') }}</span>
+          </a>
+
+          <a
+            *ngIf="authService.selectedRole() === 'transporter'"
+            routerLink="/transporter-dashboard"
+            class="btn-primary btn-sm"
+          >
+            <app-icon name="truck" [size]="13"></app-icon>
+            <span>3PL Fleet</span>
+          </a>
+
+          <a
+            *ngIf="authService.selectedRole() === 'admin'"
+            routerLink="/admin-dashboard"
+            class="btn-primary btn-sm"
+          >
+            <app-icon name="trending-up" [size]="13"></app-icon>
+            <span>Admin Ledger</span>
+          </a>
+
+          <a routerLink="/profile" class="user-avatar-btn" title="My Profile">
+            <span class="avatar-initials">{{ authService.currentUser()?.name?.substring(0, 1) || 'U' }}</span>
+          </a>
+        </div>
+      </header>
+
+      <!-- Page Content Router Outlet -->
+      <main class="page-content">
+        <div class="content-container">
+          <router-outlet></router-outlet>
+        </div>
+      </main>
+    </div>
+
+    <!-- Global Pan-India Live Location Selector Modal -->
+    <div *ngIf="isLocationModalOpen()" class="modal-backdrop" (click)="closeLocationModal()">
+      <div class="location-modal-dialog" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <div>
+            <div class="modal-badge-row">
+              <span class="live-radar-badge">LIVE 100 KM RADAR SCANNER</span>
+            </div>
+            <h3 class="modal-title">Select or Search Live Location</h3>
+            <p class="modal-subtitle">
+              Every listing, verified farmer, mandi rate, and factory quota across the platform immediately recalibrates within 100 km of your selected location.
+            </p>
+          </div>
+          <button class="modal-close-btn" (click)="closeLocationModal()" aria-label="Close modal">
+            <app-icon name="x" [size]="18"></app-icon>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Live Search Input -->
+          <div class="search-input-wrapper">
+            <app-icon name="search" [size]="16" class="search-icon"></app-icon>
+            <input
+              type="text"
+              class="location-search-input"
+              [(ngModel)]="locationSearchInput"
+              (keyup.enter)="submitLocationSearch()"
+              placeholder="Search ANY city, town or tehsil in India (e.g. Harohalli, Delhi, Ludhiana, Jaipur, Patna, Meerut...)"
+              [disabled]="isSearchingLocation()"
+            />
+            <button
+              class="search-submit-btn"
+              (click)="submitLocationSearch()"
+              [disabled]="isSearchingLocation() || !locationSearchInput.trim()"
+            >
+              <app-icon *ngIf="!isSearchingLocation()" name="arrow-right" [size]="14"></app-icon>
+              <app-icon *ngIf="isSearchingLocation()" name="loader" [size]="14"></app-icon>
+              <span>{{ isSearchingLocation() ? 'Locating...' : 'Set' }}</span>
+            </button>
+          </div>
+
+          <!-- Status / Feedback Message -->
+          <div *ngIf="locationSearchMessage()" class="location-feedback-pill">
+            <span class="live-dot-pulse"></span>
+            <span>{{ locationSearchMessage() }}</span>
+          </div>
+
+          <!-- Live Device GPS Trigger -->
+          <div class="gps-trigger-card" (click)="triggerLiveGps()">
+            <div class="gps-icon-box">
+              <app-icon name="map-pin" [size]="20"></app-icon>
+            </div>
+            <div class="gps-text-box">
+              <span class="gps-title">Detect My Live Device GPS</span>
+              <span class="gps-subtitle">Auto-pin exact browser coordinates and discover immediate 100 km farm & factory radius</span>
+            </div>
+            <button class="gps-action-btn" [disabled]="isSearchingLocation()">
+              <span>Use GPS</span>
+            </button>
+          </div>
+
+          <!-- Standard Major Pan-India Hubs -->
+          <div class="hubs-section">
+            <div class="section-title-row">
+              <span class="section-label">10 Major Pan-India Agro-Industrial Hubs</span>
+              <span class="active-badge">Active: {{ marketplaceService.currentHub().shortName }}</span>
+            </div>
+
+            <div class="hubs-grid">
+              <button
+                *ngFor="let hub of marketplaceService.standardHubs"
+                class="hub-card"
+                [class.active-hub]="marketplaceService.currentHub().id === hub.id"
+                (click)="selectHub(hub.id)"
+              >
+                <div class="hub-header">
+                  <span class="hub-state">{{ hub.state }}</span>
+                  <app-icon *ngIf="marketplaceService.currentHub().id === hub.id" name="check-circle" [size]="15"></app-icon>
+                </div>
+                <div class="hub-name">{{ hub.shortName }}</div>
+                <div class="hub-desc">{{ hub.description }}</div>
+                <div class="hub-coords">{{ hub.lat.toFixed(4) }}° N, {{ hub.lng.toFixed(4) }}° E</div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <span class="footer-note">
+            💡 Zero Fake Data Policy: When you change location, all 100 km distances, regional crops, and commercial buyers are authentically synchronized.
+          </span>
+          <button class="btn-secondary btn-sm" (click)="closeLocationModal()">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating AI Chatbot Assistant (Agri-Mitra / एग्री-मित्र) -->
+    <app-ai-chatbot></app-ai-chatbot>
+  </div>
+</ng-template>
