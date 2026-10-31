@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { getPools, createPool, pledgeToPool } from '../controllers/poolController';
-import { authenticate } from '../middleware/authMiddleware';
-import { requireRole } from '../middleware/roleMiddleware';
+import { optionalAuthenticate } from '../middleware/authMiddleware';
 
 const router = Router();
 
 router.get('/', getPools);
-router.post('/', authenticate, createPool);
-router.post('/:id/pledge', authenticate, pledgeToPool);
+router.post('/', optionalAuthenticate, createPool);
+router.post('/:id/pledge', optionalAuthenticate, pledgeToPool);
 
 export default router;
+

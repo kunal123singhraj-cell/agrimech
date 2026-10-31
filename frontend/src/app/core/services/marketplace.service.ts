@@ -241,6 +241,44 @@ export class MarketplaceService {
   // Raw signals initialized dynamically for the initial hub
   rawListings = signal<Listing[]>([]);
   rawBulkRequirements = signal<BulkRequirement[]>([]);
+  myCreatedListingIds = signal<string[]>(this.getStoredCreatedListingIds());
+
+  private getStoredCreatedListingIds(): string[] {
+    try {
+      if (typeof window === 'undefined') return [];
+      const stored = localStorage.getItem('agrimech_my_listing_ids');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  addCreatedListingId(id: string): void {
+    if (typeof window === 'undefined') return;
+    const list = this.getStoredCreatedListingIds();
+    if (!list.includes(id)) {
+      list.unshift(id);
+      localStorage.setItem('agrimech_my_listing_ids', JSON.stringify(list));
+      this.myCreatedListingIds.set(list);
+    }
+  }
+
+  private getLocalListings(): Listing[] {
+    try {
+      if (typeof window === 'undefined') return [];
+      const stored = localStorage.getItem('agrimech_local_listings');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private saveLocalListing(listing: Listing): void {
+    if (typeof window === 'undefined') return;
+    const list = this.getLocalListings().filter(l => l.id !== listing.id);
+    list.unshift(listing);
+    localStorage.setItem('agrimech_local_listings', JSON.stringify(list));
+  }
 
   // Computed signals: distances dynamically calculated based on current active hub location
   listings = computed<Listing[]>(() => {
@@ -432,9 +470,10 @@ export class MarketplaceService {
   fetchBackendListings(): void {
     this.http.get<{ success: boolean; data: any[] }>(this.apiUrl).subscribe({
       next: (res) => {
+        const hub = this.currentHub();
+        let mapped: Listing[] = [];
         if (res && Array.isArray(res.data)) {
-          const hub = this.currentHub();
-          const mapped: Listing[] = res.data.map(item => {
+          mapped = res.data.map(item => {
             const rawType = item.residueType || '';
             const cropKey: CropKey = rawType.includes('ragi') ? 'ragi'
               : rawType.includes('mulberry') ? 'mulberry'
@@ -450,7 +489,7 @@ export class MarketplaceService {
             const dist = Math.round(this.calculateDistance(hub.lat, hub.lng, itemLat, itemLng)) || 1;
 
             return {
-              id: item._id || item.id || ('LIST-' + Date.now().toString().slice(-4)),
+              id: (item._id || item.id || '').toString(),
               cropType: item.variety || this.formatCropName(rawType),
               cropKey,
               region: item.state || hub.state,
@@ -500,15 +539,27 @@ export class MarketplaceService {
               }).grade
             };
           });
-
-          this.rawListings.set(mapped);
-          console.log('[MarketplaceService] Loaded real listings from MongoDB Atlas:', mapped.length);
-        } else {
-          this.rawListings.set([]);
         }
+
+        // Merge with local created listings to guarantee zero loss
+        const localListings = this.getLocalListings();
+        const seen = new Set(mapped.map(m => m.id));
+        const merged = [...mapped];
+        for (const loc of localListings) {
+          if (!seen.has(loc.id)) {
+            seen.add(loc.id);
+            merged.unshift(loc);
+          }
+        }
+
+        this.rawListings.set(merged);
+        console.log('[MarketplaceService] Loaded synchronized listings:', merged.length);
       },
       error: () => {
-        this.rawListings.set([]);
+        const local = this.getLocalListings();
+        if (local.length > 0) {
+          this.rawListings.set(local);
+        }
       }
     });
   }
@@ -743,6 +794,10 @@ export class MarketplaceService {
       lng
     };
 
+    // Track user-created listing ID and cache locally
+    this.addCreatedListingId(id);
+    this.saveLocalListing(created);
+
     // Update raw listings signal immediately
     this.rawListings.update(items => [created, ...items]);
 
@@ -779,12 +834,21 @@ export class MarketplaceService {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    this.http.post(this.apiUrl, backendPayload, { headers }).subscribe({
+    this.http.post<any>(this.apiUrl, backendPayload, { headers }).subscribe({
       next: (res) => {
-        console.log('[MarketplaceService] Successfully saved to MongoDB Atlas:', res);
+        console.log('[MarketplaceService] Successfully saved to Backend & MongoDB Atlas:', res);
+        if (res && res.data && (res.data._id || res.data.id)) {
+          const backendId = (res.data._id || res.data.id).toString();
+          this.addCreatedListingId(backendId);
+          created.id = backendId;
+          this.saveLocalListing(created);
+          this.rawListings.update(items =>
+            items.map(item => item.id === id ? { ...item, id: backendId } : item)
+          );
+        }
         this.fetchBackendListings();
       },
-      error: (err) => console.warn('[MarketplaceService] Could not persist to backend:', err.message)
+      error: (err) => console.warn('[MarketplaceService] Backend save note:', err.message)
     });
 
     return created;
@@ -792,6 +856,27 @@ export class MarketplaceService {
 
   deleteListing(id: string): void {
     this.rawListings.update(items => items.filter(i => i.id !== id));
+
+    // Remove from local tracking
+    if (typeof window !== 'undefined') {
+      const currentIds = this.getStoredCreatedListingIds().filter(item => item !== id);
+      localStorage.setItem('agrimech_my_listing_ids', JSON.stringify(currentIds));
+      this.myCreatedListingIds.set(currentIds);
+
+      const localListings = this.getLocalListings().filter(l => l.id !== id);
+      localStorage.setItem('agrimech_local_listings', JSON.stringify(localListings));
+    }
+
+    const token = localStorage.getItem('agrimech_token');
+    const headers: { [key: string]: string } = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    this.http.delete(`${this.apiUrl}/${id}`, { headers }).subscribe({
+      next: () => console.log(`[MarketplaceService] Successfully deleted listing ${id} on backend`),
+      error: (err) => console.warn(`[MarketplaceService] Delete note:`, err.message)
+    });
   }
 
   commitToPool(requirementId: string, tonnes: number): void {

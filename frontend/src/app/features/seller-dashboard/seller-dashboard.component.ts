@@ -930,19 +930,27 @@ export class SellerDashboardComponent implements OnInit {
     return (phone || '').replace(/\D/g, '').slice(-10);
   }
 
-  // Real User Scoping: Show ONLY listings owned by the logged-in seller!
+  // Real User Scoping: Show listings owned by the logged-in seller OR created in this session!
   sellerListings = computed(() => {
     const user = this.currentUser();
-    if (!user) return [];
+    const myCreatedIds = new Set(this.marketplaceService.myCreatedListingIds());
+    const allListings = this.marketplaceService.listings();
+
+    if (!user) {
+      return allListings.filter(item => myCreatedIds.has(item.id));
+    }
+
     const userPhone = this.normalizePhone(user.phone);
 
-    return this.marketplaceService.listings().filter(item => {
+    return allListings.filter(item => {
+      if (myCreatedIds.has(item.id)) return true;
       if (userPhone && item.ownerPhone && this.normalizePhone(item.ownerPhone) === userPhone) return true;
       if (userPhone && item.farmerPhone && this.normalizePhone(item.farmerPhone) === userPhone) return true;
       if (user.id && item.ownerId && item.ownerId === user.id) return true;
       return false;
     });
   });
+
 
   filteredSellerListings = computed(() => {
     const term = this.searchFilter().toLowerCase().trim();

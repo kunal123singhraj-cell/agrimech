@@ -1,0 +1,36 @@
+[
+  {
+    "_id": "POOL-7701",
+    "title": "3,500 Tonne Ragi Straw Aggregation Pool",
+    "buyerId": "USR-BUYER-301",
+    "buyerName": "Harohalli Bio-Energy Corp",
+    "buyerPhone": "+91 98450 33910",
+    "buyerOrg": "Harohalli Bio-Energy Cogeneration Plant",
+    "residueType": "ragi_straw",
+    "cropType": "Ragi Straw (MR-1)",
+    "targetTonnes": 3500,
+    "totalTonnes": 3500,
+    "currentTonnes": 1450,
+    "offeredPricePerTonne": 2550,
+    "district": "Harohalli",
+    "state": "Karnataka",
+    "deliveryLocation": "Harohalli KIADB Phase 2, Karnataka",
+    "deadline": "2026-12-31",
+    "coordinates": {
+      "lat": 12.656,
+      "lng": 77.443
+    },
+    "status": "open",
+    "participants": [
+      {
+        "sellerId": "USR-SELLER-101",
+        "sellerName": "Shri Gowda Farm Gate",
+        "committedTonnes": 120,
+        "agreedPricePerTonne": 2550,
+        "joinedAt": "2026-10-31T23:06:57.410Z"
+      }
+    ],
+    "createdAt": "2026-10-31T23:06:57.410Z",
+    "updatedAt": "2026-10-31T23:06:57.410Z"
+  }
+]
