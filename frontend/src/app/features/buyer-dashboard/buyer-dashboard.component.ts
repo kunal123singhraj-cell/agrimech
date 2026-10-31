@@ -104,6 +104,27 @@ import { Listing } from '../../core/models/marketplace.model';
         </div>
       </div>
 
+      <!-- Satellite Supply Intelligence Callout Banner -->
+      <div class="satellite-callout-banner">
+        <div class="satellite-callout-left">
+          <div class="sat-badge font-outfit">
+            <span class="sat-dot"></span>
+            NEW: SATELLITE SUPPLY INTELLIGENCE
+          </div>
+          <h3 class="sat-title font-syne">Predict untapped crop residue before farmers register on AgriMech.</h3>
+          <p class="sat-desc font-outfit">
+            Scan multispectral Sentinel-2 estimation layers, model village-level residue yields, and discover high-potential biomass clusters beyond registered farm listings.
+          </p>
+        </div>
+        <div class="satellite-callout-right">
+          <a routerLink="/satellite-intelligence" class="btn-sat-launch font-outfit">
+            <app-icon name="satellite" [size]="15"></app-icon>
+            <span>Explore Satellite Intelligence</span>
+            <span>&rarr;</span>
+          </a>
+        </div>
+      </div>
+
       <!-- USP 1: Intelligent Multi-Farmer Optimizer Callout Banner -->
       <div class="optimizer-callout-banner">
         <div class="optimizer-callout-left">
@@ -509,6 +530,76 @@ import { Listing } from '../../core/models/marketplace.model';
       align-items: center;
       gap: 8px;
       flex-wrap: wrap;
+    }
+
+    .satellite-callout-banner {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(14, 165, 233, 0.12) 100%);
+      border: 1.5px solid rgba(16, 185, 129, 0.45);
+      border-radius: 12px;
+      padding: 18px 22px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .sat-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(16, 185, 129, 0.22);
+      color: #059669;
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 3px 8px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+    }
+
+    .sat-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #10B981;
+      box-shadow: 0 0 6px rgba(16, 185, 129, 0.8);
+    }
+
+    .sat-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--primary-text);
+      margin: 0 0 4px 0;
+    }
+
+    .sat-desc {
+      font-size: 12.5px;
+      color: var(--secondary-text);
+      max-width: 640px;
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    .btn-sat-launch {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #059669;
+      color: #FFFFFF;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25);
+    }
+
+    .btn-sat-launch:hover {
+      background: #047857;
+      transform: translateY(-1px);
     }
 
     .optimizer-callout-banner {

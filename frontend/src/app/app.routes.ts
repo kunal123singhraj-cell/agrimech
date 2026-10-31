@@ -46,6 +46,12 @@ export const routes: Routes = [
     data: { role: 'buyer' }
   },
   {
+    path: 'satellite-intelligence',
+    loadComponent: () => import('./features/satellite-intelligence/satellite-intelligence.component').then(m => m.SatelliteIntelligenceComponent),
+    canActivate: [authGuard, roleGuard],
+    data: { role: 'buyer' }
+  },
+  {
     path: 'suppliers',
     component: SuppliersComponent,
     canActivate: [authGuard, roleGuard],

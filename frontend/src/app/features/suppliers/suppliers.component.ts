@@ -1,6 +1,6 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule, Router } from '@angular/router';
+import { RouterModule, Router, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MarketplaceService } from '../../core/services/marketplace.service';
 import { NegotiationService } from '../../core/services/negotiation.service';
@@ -26,6 +26,22 @@ import { Listing } from '../../core/models/marketplace.model';
         <div class="header-count">
           <span class="count-val">{{ marketplaceService.filteredListings().length }}</span>
           <span class="count-label">Listings Matched</span>
+        </div>
+      </div>
+
+      <!-- Satellite Supply Intelligence Filter Context Strip -->
+      <div *ngIf="satelliteFilterActive" style="background: rgba(16, 185, 129, 0.12); border: 1.5px solid #10B981; border-radius: 8px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
+          <span>🛰️</span>
+          <span><strong>Satellite Supply Intelligence Filter:</strong> Displaying registered farmer lots near <strong>{{ satelliteFilterDistrict || 'Selected Zone' }}</strong></span>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <a routerLink="/satellite-intelligence" style="background: #166534; color: white; padding: 4px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 600; text-decoration: none;">
+            &larr; Back to Satellite Map
+          </a>
+          <button (click)="satelliteFilterActive = false; resetFilters()" style="background: transparent; border: 1px solid #10B981; color: #065F46; padding: 4px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 600; cursor: pointer;">
+            Clear Filter
+          </button>
         </div>
       </div>
 
@@ -851,12 +867,33 @@ export class SuppliersComponent implements OnInit {
   private qualityRankingService = inject(QualityRankingService);
   private authService = inject(AuthService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
   selectedListingForModal?: Listing;
   selectedListingForScorecard?: Listing;
+  satelliteFilterActive: boolean = false;
+  satelliteFilterDistrict: string = '';
 
   ngOnInit(): void {
     this.marketplaceService.fetchBackendListings();
+
+    this.route.queryParams.subscribe(params => {
+      if (params['district'] || params['crop'] || params['q']) {
+        this.satelliteFilterActive = true;
+        if (params['district']) {
+          this.satelliteFilterDistrict = params['district'];
+          this.marketplaceService.searchQuery.set(params['district']);
+        } else if (params['q']) {
+          this.satelliteFilterDistrict = params['q'];
+          this.marketplaceService.searchQuery.set(params['q']);
+        }
+        if (params['crop']) {
+          this.marketplaceService.selectedCrop.set(params['crop'].toLowerCase());
+        }
+        // Expand distance to Pan-India so nearby district lots are not clipped by a tight local radius
+        this.marketplaceService.maxDistance.set(2500);
+      }
+    });
   }
 
   openLogisticsModal(item: Listing): void {

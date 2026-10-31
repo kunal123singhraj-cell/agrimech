@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule, Router } from '@angular/router';
+import { RouterModule, Router, ActivatedRoute } from '@angular/router';
 import { MarketplaceService } from '../../core/services/marketplace.service';
 import { OrderOptimizerService, OptimizationResult } from '../../core/services/order-optimizer.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -752,6 +752,7 @@ export class OrderOptimizerComponent implements OnInit {
   private authService = inject(AuthService);
   private notificationService = inject(NotificationService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
   targetTons = signal<number>(250);
   selectedCrop = signal<CropKey | 'all'>('all');
@@ -765,6 +766,19 @@ export class OrderOptimizerComponent implements OnInit {
   ngOnInit(): void {
     // Ensure real listings are loaded from MongoDB Atlas
     this.marketplaceService.fetchBackendListings();
+
+    this.route.queryParams.subscribe(params => {
+      if (params['crop']) {
+        this.selectedCrop.set(params['crop'] as any);
+      }
+      if (params['targetTons']) {
+        const t = Number(params['targetTons']);
+        if (!isNaN(t) && t > 0) {
+          this.targetTons.set(t);
+        }
+      }
+    });
+
     setTimeout(() => {
       this.runOptimization();
     }, 200);

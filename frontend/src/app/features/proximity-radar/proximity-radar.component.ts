@@ -1,7 +1,7 @@
 import { Component, inject, signal, computed, OnInit, AfterViewInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterModule } from '@angular/router';
+import { Router, RouterModule, ActivatedRoute } from '@angular/router';
 import { MarketplaceService } from '../../core/services/marketplace.service';
 import { NegotiationService } from '../../core/services/negotiation.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -1029,10 +1029,22 @@ export class ProximityRadarComponent implements OnInit, AfterViewInit, OnDestroy
   private leafletMap: any = null;
   private markersLayer: any = null;
   private routeLine: any = null;
+  private route = inject(ActivatedRoute);
 
   ngOnInit(): void {
     this.marketplaceService.fetchBackendListings();
     this.marketplaceService.fetchBackendPools();
+
+    this.route.queryParams.subscribe(params => {
+      if (params['lat'] && params['lng']) {
+        const lat = Number(params['lat']);
+        const lng = Number(params['lng']);
+        const name = params['name'] || 'Satellite Scouting Zone';
+        if (!isNaN(lat) && !isNaN(lng)) {
+          this.marketplaceService.setCustomLocation(lat, lng, name);
+        }
+      }
+    });
   }
 
   ngAfterViewInit(): void {

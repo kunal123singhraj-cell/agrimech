@@ -55,8 +55,9 @@ export class AppLayoutComponent {
 
   buyerNavItems: NavItem[] = [
     { label: 'Buyer Dashboard', route: '/buyer-dashboard', icon: 'scale' },
-    { label: 'Multi-Farmer Optimizer', route: '/order-optimizer', icon: 'layers' },
+    { label: 'Satellite Supply Intelligence', route: '/satellite-intelligence', icon: 'satellite' },
     { label: '100 km Live Radar & Map', route: '/proximity-radar', icon: 'radar' },
+    { label: 'Multi-Farmer Optimizer', route: '/order-optimizer', icon: 'layers' },
     { label: 'Find Suppliers (AQI)', route: '/suppliers', icon: 'search' },
     { label: 'Freight Calculator', route: '/logistics-calculator', icon: 'truck' },
     { label: 'Bulk Requirements', route: '/bulk-requirements', icon: 'layers' },
@@ -77,6 +78,7 @@ export class AppLayoutComponent {
 
   adminNavItems: NavItem[] = [
     { label: 'Admin Revenue & Oversight', route: '/admin-dashboard', icon: 'trending-up' },
+    { label: 'Satellite Supply Intelligence', route: '/satellite-intelligence', icon: 'satellite' },
     { label: 'Marketplace Suppliers', route: '/suppliers', icon: 'search' },
     { label: '100 km Radar & Map', route: '/proximity-radar', icon: 'radar' },
     { label: 'All Orders & Escrows', route: '/orders', icon: 'shopping-bag' },
@@ -127,6 +129,7 @@ export class AppLayoutComponent {
   private updateTitle(url: string): void {
     if (url.includes('/seller-dashboard')) this.currentPageTitle.set(this.i18nService.t('nav.sellerDashboard', 'Seller Dashboard'));
     else if (url.includes('/buyer-dashboard')) this.currentPageTitle.set(this.i18nService.t('nav.buyerDashboard', 'Buyer Dashboard'));
+    else if (url.includes('/satellite-intelligence')) this.currentPageTitle.set('Satellite Supply Intelligence (Remote Sensing)');
     else if (url.includes('/transporter-dashboard')) this.currentPageTitle.set(this.i18nService.t('nav.transporterDashboard', '3PL Logistics Workspace'));
     else if (url.includes('/admin-dashboard')) this.currentPageTitle.set(this.i18nService.t('nav.adminDashboard', 'Admin Revenue & Oversight'));
     else if (url.includes('/order-optimizer')) this.currentPageTitle.set('Multi-Farmer Order Optimizer (USP 1)');

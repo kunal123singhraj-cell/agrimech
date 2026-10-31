@@ -1,0 +1,920 @@
+<div class="satellite-page">
+  <!-- Top Live Hub & Geodetic Strip -->
+  <div class="sat-geodetic-strip">
+    <div class="strip-left">
+      <span class="pulse-beacon"></span>
+      <span class="strip-tag font-outfit">SATELLITE REMOTE SENSING ENGINE</span>
+      <span class="strip-hub font-outfit">
+        Reference Datum: <strong>{{ marketplaceService.currentHub().shortName }}</strong>
+        ({{ marketplaceService.currentHub().lat.toFixed(4) }}° N, {{ marketplaceService.currentHub().lng.toFixed(4) }}° E)
+      </span>
+      <span class="strip-sensor-badge font-mono">Sentinel-2 MSI Level-2A BOA</span>
+    </div>
+
+    <div class="strip-right">
+      <div class="hub-select-wrapper">
+        <label class="hub-sel-label">Switch Industrial Plant Hub:</label>
+        <select
+          [ngModel]="marketplaceService.currentHub().id"
+          (ngModelChange)="switchHub($event)"
+          class="hub-dropdown"
+        >
+          <option *ngFor="let h of marketplaceService.standardHubs" [value]="h.id">
+            {{ h.shortName }} ({{ h.state }})
+          </option>
+        </select>
+      </div>
+
+      <button
+        type="button"
+        class="btn-sensitivity-trigger"
+        (click)="isSensitivityModalOpen.set(true)"
+        title="Open interactive agronomic formula and sensitivity inspector"
+      >
+        <app-icon name="sparkles" [size]="13"></app-icon>
+        <span>Sensitivity Calculator</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Mandatory Satellite Disclosure & Demo Mode Banner -->
+  <div class="sat-disclosure-banner">
+    <div class="banner-badge font-outfit">
+      <span class="badge-dot"></span>
+      🛰️ DEMO ESTIMATION MODE &bull; METHODOLOGY DISCLOSURE
+    </div>
+    <div class="banner-text font-outfit">
+      <strong>Transparent Agro-Climatic Remote Sensing:</strong> Agricultural availability metrics shown are
+      <em>predictive estimates</em> derived from Sentinel-2 multispectral surface reflectance indices (NDVI, NDRE)
+      and regional crop-cutting yield models. Predictions indicate potential residue generation in uncontracted village areas;
+      they do not represent physical on-site stock measurements. Net availability factors (CAF) deliberately account for
+      dairy cattle fodder retention and soil conservation mulching.
+    </div>
+  </div>
+
+  <!-- Main Hero Header -->
+  <div class="sat-header">
+    <div>
+      <div class="hero-tagline font-outfit">🌾 Pre-Registration Supply Discovery</div>
+      <h1 class="page-title font-syne">Satellite Supply Intelligence</h1>
+      <p class="page-subtitle font-outfit">
+        Detect untracked crop residue availability across agricultural clusters before farmers register on AgriMech.
+        Model village-level biomass production, pinpoint harvesting windows, and bridge virgin supply with registered local logistics.
+      </p>
+    </div>
+
+    <div class="header-tab-group">
+      <button
+        type="button"
+        class="header-tab-btn"
+        [class.active]="activeTab() === 'map_and_cards'"
+        (click)="activeTab.set('map_and_cards')"
+      >
+        <span>🗺️ Regional Map & Supply Lots</span>
+      </button>
+      <button
+        type="button"
+        class="header-tab-btn"
+        [class.active]="activeTab() === 'methodology'"
+        (click)="activeTab.set('methodology')"
+      >
+        <span>🔬 Estimation Formula & Physics</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Aggregate Metric Cards (4 items) -->
+  <div class="metrics-row">
+    <div class="metric-card">
+      <div class="metric-top">
+        <span class="metric-label">Monitored Farmland</span>
+        <span class="metric-icon">🛰️</span>
+      </div>
+      <div class="metric-value font-mono">
+        {{ satelliteService.summaryMetrics().totalAreaHectares.toLocaleString('en-IN') }}
+        <span class="unit">ha</span>
+      </div>
+      <div class="metric-sub">
+        Across {{ satelliteService.summaryMetrics().monitoredRegionsCount }} surveyed village clusters
+      </div>
+    </div>
+
+    <div class="metric-card highlight-metric">
+      <div class="metric-top">
+        <span class="metric-label">Estimated Residue Availability</span>
+        <span class="metric-icon">🌾</span>
+      </div>
+      <div class="metric-value font-mono text-green">
+        {{ satelliteService.summaryMetrics().totalResidueTonnes.toLocaleString('en-IN') }}
+        <span class="unit">Tonnes</span>
+      </div>
+      <div class="metric-sub font-mono">
+        from {{ satelliteService.summaryMetrics().totalCropProductionTonnes.toLocaleString('en-IN') }} T crop yield
+      </div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-top">
+        <span class="metric-label">High-Yield Hotspots</span>
+        <span class="metric-icon">🟢</span>
+      </div>
+      <div class="metric-value font-mono">
+        {{ satelliteService.summaryMetrics().highAvailabilityCount }}
+        <span class="unit">Zones</span>
+      </div>
+      <div class="metric-sub">
+        &gt; 1,200 Tonnes commercial aggregation viability
+      </div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-top">
+        <span class="metric-label">Mean Spectral Confidence</span>
+        <span class="metric-icon">📊</span>
+      </div>
+      <div class="metric-value font-mono">
+        {{ satelliteService.summaryMetrics().averageConfidencePercent }}%
+      </div>
+      <div class="metric-sub">
+        Sub-10m Sentinel-2 pixel ground classification
+      </div>
+    </div>
+  </div>
+
+  <!-- Search & Multi-Filter Control Strip -->
+  <div class="filter-card">
+    <div class="filter-primary-row">
+      <!-- Search Input -->
+      <div class="search-box">
+        <app-icon name="search" [size]="14"></app-icon>
+        <input
+          type="text"
+          placeholder="Search village, tehsil, district, crop, or agro notes..."
+          [ngModel]="satelliteService.searchQuery()"
+          (ngModelChange)="satelliteService.searchQuery.set($event); onFilterChange()"
+          class="search-input"
+        />
+        <button
+          *ngIf="satelliteService.searchQuery()"
+          type="button"
+          class="btn-clear-search"
+          (click)="satelliteService.searchQuery.set(''); onFilterChange()"
+        >
+          &times;
+        </button>
+      </div>
+
+      <!-- Crop Filter Dropdown -->
+      <div class="filter-select-box">
+        <label>Crop Feedstock:</label>
+        <select
+          [ngModel]="satelliteService.selectedCrop()"
+          (ngModelChange)="satelliteService.selectedCrop.set($event); onFilterChange()"
+          class="select-control"
+        >
+          <option value="all">All Crop Types</option>
+          <option *ngFor="let c of satelliteService.availableCrops()" [value]="c.key">
+            {{ c.name }}
+          </option>
+        </select>
+      </div>
+
+      <!-- District Filter Dropdown -->
+      <div class="filter-select-box">
+        <label>District / Belt:</label>
+        <select
+          [ngModel]="satelliteService.selectedDistrict()"
+          (ngModelChange)="satelliteService.selectedDistrict.set($event); onFilterChange()"
+          class="select-control"
+        >
+          <option value="all">All Districts (Pan-India)</option>
+          <option *ngFor="let d of satelliteService.availableDistricts()" [value]="d">
+            {{ d }}
+          </option>
+        </select>
+      </div>
+
+      <!-- Harvest Status Filter -->
+      <div class="filter-select-box">
+        <label>Harvest Period / Status:</label>
+        <select
+          [ngModel]="satelliteService.selectedHarvestStatus()"
+          (ngModelChange)="satelliteService.selectedHarvestStatus.set($event); onFilterChange()"
+          class="select-control"
+        >
+          <option value="all">All Phenological Stages</option>
+          <option value="Active Harvesting Window">⚡ Active Harvesting Window</option>
+          <option value="Maturing / Near Harvest">🌾 Maturing / Near Harvest</option>
+          <option value="Standing Crop (Vegetative)">🌱 Standing Crop (Vegetative)</option>
+          <option value="Post-Harvest Stubble Window">🚜 Post-Harvest Stubble Window</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Secondary Filter Row: Availability Color Pills & Minimum Tonnage Slider -->
+    <div class="filter-secondary-row">
+      <div class="avail-pills-group">
+        <span class="pills-label">Residue Availability:</span>
+        <button
+          type="button"
+          class="avail-pill"
+          [class.active]="satelliteService.selectedAvailability() === 'all'"
+          (click)="satelliteService.selectedAvailability.set('all'); onFilterChange()"
+        >
+          All ({{ satelliteService.regionsWithDistance().length }})
+        </button>
+        <button
+          type="button"
+          class="avail-pill pill-high"
+          [class.active]="satelliteService.selectedAvailability() === 'high'"
+          (click)="satelliteService.selectedAvailability.set('high'); onFilterChange()"
+        >
+          <span class="dot-indicator green"></span>
+          High (&gt;1,200 T)
+        </button>
+        <button
+          type="button"
+          class="avail-pill pill-med"
+          [class.active]="satelliteService.selectedAvailability() === 'medium'"
+          (click)="satelliteService.selectedAvailability.set('medium'); onFilterChange()"
+        >
+          <span class="dot-indicator yellow"></span>
+          Medium (400–1,199 T)
+        </button>
+        <button
+          type="button"
+          class="avail-pill pill-low"
+          [class.active]="satelliteService.selectedAvailability() === 'low'"
+          (click)="satelliteService.selectedAvailability.set('low'); onFilterChange()"
+        >
+          <span class="dot-indicator red"></span>
+          Low (&lt;400 T)
+        </button>
+        <button
+          type="button"
+          class="avail-pill pill-grey"
+          [class.active]="satelliteService.selectedAvailability() === 'insufficient'"
+          (click)="satelliteService.selectedAvailability.set('insufficient'); onFilterChange()"
+        >
+          <span class="dot-indicator grey"></span>
+          Insufficient Data
+        </button>
+      </div>
+
+      <div class="slider-group">
+        <label>Min Predicted Tonnes: <strong>{{ satelliteService.minTonnes() }} T</strong></label>
+        <input
+          type="range"
+          min="0"
+          max="10000"
+          step="250"
+          [ngModel]="satelliteService.minTonnes()"
+          (ngModelChange)="satelliteService.minTonnes.set($event); onFilterChange()"
+          class="min-slider"
+        />
+      </div>
+
+      <button
+        type="button"
+        class="btn-reset-filters"
+        (click)="resetAllFilters()"
+        title="Reset all filters to show all regions"
+      >
+        <span>Reset Filters</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- TAB 1: INTERACTIVE MAP & RESIDUE CARDS -->
+  <div *ngIf="activeTab() === 'map_and_cards'" class="dashboard-main-grid">
+    
+    <!-- LEFT / MAIN: MAP & REGIONAL SUPPLY CARDS -->
+    <div class="main-column">
+      
+      <!-- Interactive Satellite Map Card -->
+      <div class="map-card">
+        <div class="map-card-header">
+          <div class="map-title-box">
+            <h3 class="map-title font-syne">Interactive Satellite Biomass Availability Map</h3>
+            <span class="map-sub font-outfit">
+              Regional markers indicate predicted residue quantities across uncontracted village areas
+            </span>
+          </div>
+
+          <div class="map-actions-group">
+            <!-- Satellite vs Topo Toggle -->
+            <div class="map-layer-toggle">
+              <button
+                type="button"
+                class="layer-toggle-btn"
+                [class.active]="activeMapTileMode() === 'satellite'"
+                (click)="setMapTileMode('satellite')"
+              >
+                <span>🛰️ Satellite Hybrid</span>
+              </button>
+              <button
+                type="button"
+                class="layer-toggle-btn"
+                [class.active]="activeMapTileMode() === 'street'"
+                (click)="setMapTileMode('street')"
+              >
+                <span>🗺️ Agro Topo</span>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              class="btn-map-tool"
+              (click)="fitAllMarkers()"
+              title="Fit map view to all filtered markers"
+            >
+              <span>Fit All Markers</span>
+            </button>
+
+            <button
+              type="button"
+              class="btn-map-tool"
+              (click)="centerOnHub()"
+              title="Center map on your industrial hub"
+            >
+              <span>Center on Hub</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Map Container -->
+        <div class="map-wrapper">
+          <div id="satellite-leaflet-map" class="leaflet-map-element"></div>
+
+          <!-- Color Indicator Floating Map Legend -->
+          <div class="map-legend-overlay font-outfit">
+            <div class="legend-header">
+              <span class="legend-icon">🛰️</span>
+              <strong>Supply Availability Key</strong>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot green"></span>
+              <span class="legend-text"><strong>High</strong> (&ge; 1,200 T) &bull; Commercial Viable</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot yellow"></span>
+              <span class="legend-text"><strong>Medium</strong> (400–1,199 T) &bull; Cluster Lot</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot red"></span>
+              <span class="legend-text"><strong>Low</strong> (100–399 T) &bull; Local Availability</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot grey"></span>
+              <span class="legend-text"><strong>Grey</strong> &bull; Insufficient / Cloud Covered</span>
+            </div>
+            <div class="legend-divider"></div>
+            <div class="legend-item">
+              <span class="legend-hub-symbol">🏭</span>
+              <span class="legend-text">Active Industrial Hub Datum</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section Title for Cards -->
+      <div class="cards-section-header">
+        <div>
+          <h3 class="cards-title font-syne">Predicted Agricultural Residue Availability Cards</h3>
+          <p class="cards-sub font-outfit">
+            Showing {{ satelliteService.filteredRegions().length }} mapped agricultural clusters. Click any card to inspect full spectral details.
+          </p>
+        </div>
+        <div class="cards-sort-note font-mono">
+          Ref Hub: {{ marketplaceService.currentHub().shortName }}
+        </div>
+      </div>
+
+      <!-- Residue Cards Grid -->
+      <div *ngIf="satelliteService.filteredRegions().length > 0; else noRegionsFound" class="regions-grid">
+        <div
+          *ngFor="let region of satelliteService.filteredRegions()"
+          class="region-card"
+          [class.selected]="satelliteService.selectedRegion()?.id === region.id"
+          [class.border-green]="region.availabilityLevel === 'high'"
+          [class.border-yellow]="region.availabilityLevel === 'medium'"
+          [class.border-red]="region.availabilityLevel === 'low'"
+          [class.border-grey]="region.availabilityLevel === 'insufficient'"
+          (click)="selectRegion(region)"
+        >
+          <!-- Card Header -->
+          <div class="rc-header">
+            <div>
+              <div class="rc-village font-syne">{{ region.villageName }}</div>
+              <div class="rc-loc font-outfit">
+                📍 {{ region.talukTehsil }}, {{ region.district }} ({{ region.state }})
+              </div>
+            </div>
+
+            <!-- Availability Badge -->
+            <div
+              class="rc-avail-badge font-outfit"
+              [class.badge-green]="region.availabilityLevel === 'high'"
+              [class.badge-yellow]="region.availabilityLevel === 'medium'"
+              [class.badge-red]="region.availabilityLevel === 'low'"
+              [class.badge-grey]="region.availabilityLevel === 'insufficient'"
+            >
+              <span class="badge-dot-sm"></span>
+              <span>{{ region.availabilityLevel | uppercase }}</span>
+            </div>
+          </div>
+
+          <!-- Main Crop Pill & Tonnage -->
+          <div class="rc-tonnage-strip">
+            <div class="rc-tonnage-box">
+              <span class="rc-tonnage-val font-mono font-bold">
+                {{ region.estimatedResidueTonnes.toLocaleString('en-IN') }}
+              </span>
+              <span class="rc-tonnage-unit">Tonnes Residue</span>
+            </div>
+            <div class="rc-crop-tag font-outfit">
+              🌾 {{ region.cropName }}
+            </div>
+          </div>
+
+          <!-- Crop Specs Grid -->
+          <div class="rc-specs-grid font-outfit">
+            <div class="rc-spec-item">
+              <span class="rc-lbl">Cultivated Farmland</span>
+              <span class="rc-val font-mono">{{ region.cultivatedAreaHectares.toLocaleString('en-IN') }} ha</span>
+            </div>
+            <div class="rc-spec-item">
+              <span class="rc-lbl">Est. Crop Yield</span>
+              <span class="rc-val font-mono">{{ region.estimatedCropProductionTonnes.toLocaleString('en-IN') }} t</span>
+            </div>
+            <div class="rc-spec-item">
+              <span class="rc-lbl">Harvest Window</span>
+              <span class="rc-val font-mono">{{ region.expectedHarvestPeriod }}</span>
+            </div>
+            <div class="rc-spec-item">
+              <span class="rc-lbl">Transit Distance</span>
+              <span class="rc-val font-mono">{{ region.distanceKm }} km from Hub</span>
+            </div>
+          </div>
+
+          <!-- Phenological Status & Confidence Strip -->
+          <div class="rc-status-strip font-outfit">
+            <span class="rc-pheno-tag">
+              ⏱️ {{ region.harvestStatus }}
+            </span>
+            <span class="rc-conf-tag font-mono">
+              ★ {{ region.predictionConfidencePercent }}% Conf.
+            </span>
+          </div>
+
+          <!-- Card Footer Actions -->
+          <div class="rc-footer">
+            <div class="rc-satellite-meta font-mono">
+              Tile: {{ region.sentinelTileId }} &bull; Pass: {{ region.lastSatellitePassDate }}
+            </div>
+
+            <div class="rc-actions">
+              <button
+                type="button"
+                class="btn-inspect-sm"
+                (click)="selectRegion(region); $event.stopPropagation()"
+              >
+                <span>Inspect Profile &rarr;</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <ng-template #noRegionsFound>
+        <div class="empty-state-card">
+          <div class="empty-icon">🛰️</div>
+          <h4 class="empty-title font-syne">No Agricultural Zones Match Selected Filters</h4>
+          <p class="empty-desc font-outfit">
+            Try loosening the minimum tonnage threshold or resetting the district and crop feedstock filters.
+          </p>
+          <button type="button" class="btn-reset-filters" (click)="resetAllFilters()">
+            <span>Reset All Filters</span>
+          </button>
+        </div>
+      </ng-template>
+
+    </div>
+
+    <!-- RIGHT: REGION DETAILS INSPECTOR DRAWER -->
+    <div class="details-column">
+      <div *ngIf="satelliteService.selectedRegion() as reg; else noSelection" class="inspector-card">
+        
+        <div class="inspector-header">
+          <div class="insp-tag-row">
+            <span class="insp-badge font-mono">REMOTE SENSING AGRO PROFILE</span>
+            <div
+              class="insp-avail font-outfit"
+              [class.badge-green]="reg.availabilityLevel === 'high'"
+              [class.badge-yellow]="reg.availabilityLevel === 'medium'"
+              [class.badge-red]="reg.availabilityLevel === 'low'"
+              [class.badge-grey]="reg.availabilityLevel === 'insufficient'"
+            >
+              {{ reg.availabilityLevel | uppercase }} AVAILABILITY
+            </div>
+          </div>
+
+          <h2 class="insp-village font-syne">{{ reg.villageName }}</h2>
+          <div class="insp-geo font-outfit">
+            📍 {{ reg.talukTehsil }}, {{ reg.district }}, {{ reg.state }}
+            <span class="geo-coords font-mono">({{ reg.lat.toFixed(4) }}°N, {{ reg.lng.toFixed(4) }}°E)</span>
+          </div>
+        </div>
+
+        <!-- Residue Available Highlight -->
+        <div class="insp-metric-spotlight">
+          <div class="spot-label font-outfit">Expected Net Residue Availability</div>
+          <div class="spot-number font-mono">
+            {{ reg.estimatedResidueTonnes.toLocaleString('en-IN') }}
+            <span class="spot-unit">Tonnes</span>
+          </div>
+          <div class="spot-sub font-outfit">
+            {{ reg.cropName }} &bull; {{ reg.distanceKm }} km road transit to {{ marketplaceService.currentHub().shortName }}
+          </div>
+        </div>
+
+        <!-- Section: Crop & Phenology Specs -->
+        <div class="insp-section">
+          <h4 class="insp-sect-title font-syne">1. Crop & Phenology Profile</h4>
+          <div class="insp-specs-table font-outfit">
+            <div class="spec-row">
+              <span class="spec-k">Crop Feedstock</span>
+              <span class="spec-v font-bold">{{ reg.cropName }}</span>
+            </div>
+            <div class="spec-row">
+              <span class="spec-k">Cultivated Area</span>
+              <span class="spec-v font-mono">{{ reg.cultivatedAreaHectares.toLocaleString('en-IN') }} Hectares</span>
+            </div>
+            <div class="spec-row">
+              <span class="spec-k">Harvest Status</span>
+              <span class="spec-v font-bold text-amber">{{ reg.harvestStatus }}</span>
+            </div>
+            <div class="spec-row">
+              <span class="spec-k">Expected Harvesting Window</span>
+              <span class="spec-v font-mono">{{ reg.expectedHarvestPeriod }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Satellite Spectral Telemetry -->
+        <div class="insp-section">
+          <h4 class="insp-sect-title font-syne">2. Sentinel-2 Spectral Telemetry</h4>
+          <div class="telemetry-grid font-outfit">
+            <div class="telem-box">
+              <div class="telem-lbl">Sentinel-2 Tile</div>
+              <div class="telem-val font-mono">{{ reg.sentinelTileId }}</div>
+            </div>
+            <div class="telem-box">
+              <div class="telem-lbl">Last Pass Date</div>
+              <div class="telem-val font-mono">{{ reg.lastSatellitePassDate }}</div>
+            </div>
+            <div class="telem-box">
+              <div class="telem-lbl">Mean NDVI</div>
+              <div class="telem-val font-mono text-green">{{ reg.ndviMean }}</div>
+              <div class="telem-bar"><div class="telem-bar-fill" [style.width.%]="reg.ndviMean * 100"></div></div>
+            </div>
+            <div class="telem-box">
+              <div class="telem-lbl">Mean NDRE (Red Edge)</div>
+              <div class="telem-val font-mono text-amber">{{ reg.ndreMean }}</div>
+              <div class="telem-bar"><div class="telem-bar-fill bg-amber" [style.width.%]="reg.ndreMean * 100"></div></div>
+            </div>
+            <div class="telem-box">
+              <div class="telem-lbl">Cloud Cover</div>
+              <div class="telem-val font-mono">{{ reg.cloudCoverPercent }}%</div>
+            </div>
+            <div class="telem-box">
+              <div class="telem-lbl">Prediction Confidence</div>
+              <div class="telem-val font-mono font-bold">{{ reg.predictionConfidencePercent }}%</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Agronomic Formula & Mass Balance -->
+        <div class="insp-section">
+          <h4 class="insp-sect-title font-syne">3. Agronomic Mass Balance Formula</h4>
+          <div class="formula-box font-mono">
+            <div class="f-step">
+              <span class="f-tag">Area &times; Yield</span>
+              <span>{{ reg.cultivatedAreaHectares }} ha &times; {{ (reg.estimatedCropProductionTonnes / reg.cultivatedAreaHectares).toFixed(1) }} t/ha = <strong>{{ reg.estimatedCropProductionTonnes.toLocaleString('en-IN') }} t crop</strong></span>
+            </div>
+            <div class="f-step">
+              <span class="f-tag">Crop &times; RPR</span>
+              <span>{{ reg.estimatedCropProductionTonnes.toLocaleString('en-IN') }} t &times; {{ reg.rpr }} (RPR) = <strong>{{ reg.theoreticalResidueTonnes.toLocaleString('en-IN') }} t total residue</strong></span>
+            </div>
+            <div class="f-step highlight-f-step">
+              <span class="f-tag">Residue &times; CAF</span>
+              <span>{{ reg.theoreticalResidueTonnes.toLocaleString('en-IN') }} t &times; {{ reg.caf }} (CAF) = <strong class="text-green">{{ reg.estimatedResidueTonnes.toLocaleString('en-IN') }} t net collectable</strong></span>
+            </div>
+          </div>
+          <div class="caf-notice font-outfit">
+            ℹ️ <strong>Collection Availability Factor (CAF = {{ reg.caf }}):</strong> Accounts for ~{{ Math.round((1 - reg.caf) * 100) }}% residue retained locally for livestock fodder and field mulching.
+          </div>
+        </div>
+
+        <!-- Section: Regional Supplier Context -->
+        <div class="insp-section">
+          <h4 class="insp-sect-title font-syne">4. AgriMech Ecosystem Bridge</h4>
+          <div class="bridge-card font-outfit">
+            <div *ngIf="reg.registeredSuppliersCount > 0; else noRegSuppliers">
+              <div class="bridge-status green font-bold">
+                ✓ {{ reg.registeredSuppliersCount }} Verified AgriMech Suppliers Active in District
+              </div>
+              <p class="bridge-desc">
+                Contracted lots and APMC weighbridge scale slips exist nearby. You can directly aggregate active farmer listings or initiate direct contract farming across the remaining {{ reg.estimatedResidueTonnes.toLocaleString('en-IN') }} tonnes of uncontracted village potential.
+              </p>
+            </div>
+            <ng-template #noRegSuppliers>
+              <div>
+                <div class="bridge-status amber font-bold">
+                  ⚡ Virgin / Untapped Feedstock Frontier
+                </div>
+                <p class="bridge-desc">
+                  No individual farmers are registered in this village cluster yet. This presents an exclusive first-mover biomass aggregation opportunity for direct FPO aggregation or contract baling!
+                </p>
+              </div>
+            </ng-template>
+          </div>
+        </div>
+
+        <!-- Agro Field Notes -->
+        <div class="insp-notes font-outfit">
+          <strong>Field Agrometeorology Notes:</strong> {{ reg.notes }}
+        </div>
+
+        <!-- CRITICAL ACTION BUTTONS (Connecting with existing AgriMech features) -->
+        <div class="insp-actions-group">
+          <!-- Button 1: Find Registered Suppliers Nearby (Explicit prompt requirement) -->
+          <button
+            type="button"
+            class="btn-action-primary font-outfit"
+            (click)="findRegisteredSuppliersNearby(reg)"
+            title="Search registered suppliers and active farm lots in this district"
+          >
+            <app-icon name="search" [size]="15"></app-icon>
+            <span>Find Registered Suppliers Nearby</span>
+          </button>
+
+          <!-- Button 2: Launch Multi-Farmer Optimizer -->
+          <button
+            type="button"
+            class="btn-action-secondary font-outfit"
+            (click)="launchOrderOptimizer(reg)"
+            title="Bundle nearby farmers for this crop into an optimized consignment"
+          >
+            <app-icon name="layers" [size]="15"></app-icon>
+            <span>Launch Multi-Farmer Optimizer</span>
+          </button>
+
+          <!-- Button 3: Calculate Landed Freight -->
+          <button
+            type="button"
+            class="btn-action-outline font-outfit"
+            (click)="openFreightCalculator(reg)"
+            title="Calculate trucking logistics freight from this village to factory gate"
+          >
+            <app-icon name="truck" [size]="14"></app-icon>
+            <span>Calculate Freight to Plant</span>
+          </button>
+
+          <!-- Button 4: Post Bulk Requirement -->
+          <button
+            type="button"
+            class="btn-action-outline font-outfit"
+            (click)="postBulkRequirement(reg)"
+            title="Create a targeted 100 KM intake requirement for this area"
+          >
+            <app-icon name="plus" [size]="14"></app-icon>
+            <span>Post Intake Quota for this Belt</span>
+          </button>
+
+          <!-- Button 5: View on 100 KM Live Radar -->
+          <button
+            type="button"
+            class="btn-action-outline font-outfit"
+            (click)="viewOnProximityRadar(reg)"
+            title="Center 100 KM Radar around this village coordinate"
+          >
+            <app-icon name="radar" [size]="14"></app-icon>
+            <span>Inspect 100 KM Live Radar</span>
+          </button>
+        </div>
+
+      </div>
+
+      <ng-template #noSelection>
+        <div class="inspector-empty font-outfit">
+          <div class="empty-pin">📍</div>
+          <h4>Select an Agricultural Zone</h4>
+          <p>Click any map marker or regional card to inspect the complete satellite agronomic estimation profile.</p>
+        </div>
+      </ng-template>
+    </div>
+
+  </div>
+
+  <!-- TAB 2: METHODOLOGY & REMOTE SENSING PHYSICS -->
+  <div *ngIf="activeTab() === 'methodology'" class="methodology-container font-outfit">
+    <div class="method-card">
+      <h2 class="method-title font-syne">Sentinel-2 Crop Residue Availability Estimation Architecture</h2>
+      <p class="method-intro">
+        AgriMech's remote sensing pipeline integrates multispectral satellite telemetry, agronomic crop phenology indices,
+        and localized mass-balance ratios to predict agricultural residue generation with commercial precision.
+      </p>
+
+      <div class="method-steps-grid">
+        <div class="step-card">
+          <div class="step-num font-mono">01</div>
+          <h4 class="step-title font-syne">Multispectral Imagery Acquisition</h4>
+          <p class="step-desc">
+            Surface reflectance bands from ESA Copernicus Sentinel-2 (B4 Red, B8 NIR, B8A Narrow NIR) are processed
+            at 10m &amp; 20m spatial resolution. Bottom-of-Atmosphere (Level-2A BOA) corrections isolate true vegetative spectra from atmospheric haze.
+          </p>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num font-mono">02</div>
+          <h4 class="step-title font-syne">Crop Canopy &amp; Yield Estimation</h4>
+          <p class="step-desc">
+            Normalized Difference Vegetation Index (NDVI) and Red Edge (NDRE) time-series track vegetative vigor,
+            heading, and senescence. Supervised ground-truth classification maps crop type and calibrated yield per hectare.
+          </p>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num font-mono">03</div>
+          <h4 class="step-title font-syne">Residue-to-Product Ratio (RPR)</h4>
+          <p class="step-desc">
+            Residue generation is modeled using ICAR / PAU agronomic ratios. For example, Paddy Straw has an RPR of 1.30,
+            meaning 1.3 tonnes of stubble is produced for every 1 tonne of grain harvested.
+          </p>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num font-mono">04</div>
+          <h4 class="step-title font-syne">Collection Availability Factor (CAF)</h4>
+          <p class="step-desc">
+            Crucially, not all residue can be gathered. The CAF parameter discounts livestock fodder consumption (up to 50% for Ragi),
+            soil conservation blanketing, and local domestic uses, isolating only true net collectible biomass.
+          </p>
+        </div>
+      </div>
+
+      <div class="method-table-section">
+        <h3 class="sect-subtitle font-syne">Configurable Crop Agronomic Reference Parameters</h3>
+        <table class="agronomic-table font-outfit">
+          <thead>
+            <tr>
+              <th>Crop Feedstock</th>
+              <th>Avg Yield (t/ha)</th>
+              <th>Residue-to-Product (RPR)</th>
+              <th>Collection Factor (CAF)</th>
+              <th>Local Retention Reason</th>
+              <th>Calorific Value (kcal/kg)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of satelliteService.availableCrops()">
+              <td><strong>{{ item.name }}</strong></td>
+              <td class="font-mono">{{ getCropParam(item.key).averageYieldPerHa }} t/ha</td>
+              <td class="font-mono">{{ getCropParam(item.key).rpr }}</td>
+              <td class="font-mono">{{ getCropParam(item.key).caf }}</td>
+              <td>{{ getCropParam(item.key).fodderRetentionPercent }}% Fodder &bull; {{ getCropParam(item.key).mulchRetentionPercent }}% Mulch</td>
+              <td class="font-mono">{{ getCropParam(item.key).calorificValueKcalKg }} kcal</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- SENSITIVITY & FORMULA CALCULATOR MODAL -->
+  <div *ngIf="isSensitivityModalOpen()" class="modal-backdrop" (click)="isSensitivityModalOpen.set(false)">
+    <div class="sens-modal font-outfit" (click)="$event.stopPropagation()">
+      <div class="sens-header">
+        <div>
+          <div class="sens-badge font-mono">ESTIMATION PARAMETER INSPECTOR</div>
+          <h3 class="sens-title font-syne">Residue Estimation Sensitivity Calculator</h3>
+          <p class="sens-sub">
+            Test custom area, yield, RPR, and Collection Availability factors to model scenario impacts on commercial biomass availability.
+          </p>
+        </div>
+        <button type="button" class="btn-close-modal" (click)="isSensitivityModalOpen.set(false)">&times;</button>
+      </div>
+
+      <div class="sens-body">
+        <div class="sens-controls-col">
+          <div class="form-group">
+            <label>Select Crop Feedstock:</label>
+            <select
+              [(ngModel)]="customCalc.cropKey"
+              (change)="onSensitivityCropChange()"
+              class="form-control"
+            >
+              <option *ngFor="let c of satelliteService.availableCrops()" [value]="c.key">
+                {{ c.name }}
+              </option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Cultivated Farmland Area: <strong>{{ customCalc.areaHa.toLocaleString('en-IN') }} Hectares</strong></label>
+            <input
+              type="range"
+              min="50"
+              max="10000"
+              step="50"
+              [(ngModel)]="customCalc.areaHa"
+              (ngModelChange)="recalculateCustomSensitivity()"
+              class="sens-slider"
+            />
+          </div>
+
+          <div class="form-group">
+            <label>Average Grain/Crop Yield: <strong>{{ customCalc.customYield }} Tonnes/Hectare</strong></label>
+            <input
+              type="range"
+              min="0.5"
+              max="90"
+              step="0.1"
+              [(ngModel)]="customCalc.customYield"
+              (ngModelChange)="recalculateCustomSensitivity()"
+              class="sens-slider"
+            />
+          </div>
+
+          <div class="form-group">
+            <label>Residue-to-Product Ratio (RPR): <strong>{{ customCalc.customRpr }}</strong></label>
+            <input
+              type="range"
+              min="0.1"
+              max="3.5"
+              step="0.05"
+              [(ngModel)]="customCalc.customRpr"
+              (ngModelChange)="recalculateCustomSensitivity()"
+              class="sens-slider"
+            />
+          </div>
+
+          <div class="form-group">
+            <label>Collection Availability Factor (CAF): <strong>{{ customCalc.customCaf }} ({{ Math.round(customCalc.customCaf * 100) }}% Collectable)</strong></label>
+            <input
+              type="range"
+              min="0.1"
+              max="1.0"
+              step="0.05"
+              [(ngModel)]="customCalc.customCaf"
+              (ngModelChange)="recalculateCustomSensitivity()"
+              class="sens-slider"
+            />
+            <div class="input-hint">
+              Remaining {{ Math.round((1 - customCalc.customCaf) * 100) }}% retained for cattle dry fodder and soil mulching.
+            </div>
+          </div>
+        </div>
+
+        <div class="sens-results-col">
+          <div class="sens-result-card" *ngIf="customResult() as res">
+            <div class="calc-box-title font-syne">Predicted Outcome</div>
+
+            <div class="calc-res-item">
+              <span class="calc-res-lbl">Total Crop Harvest</span>
+              <span class="calc-res-val font-mono">{{ res.cropProduction.toLocaleString('en-IN') }} Tonnes</span>
+            </div>
+
+            <div class="calc-res-item">
+              <span class="calc-res-lbl">Theoretical Stubble Biomass</span>
+              <span class="calc-res-val font-mono">{{ res.theoreticalResidue.toLocaleString('en-IN') }} Tonnes</span>
+            </div>
+
+            <div class="calc-res-hero">
+              <div class="hero-lbl">Net Collectable Residue</div>
+              <div class="hero-val font-mono text-green">
+                {{ res.netResidue.toLocaleString('en-IN') }}
+                <span class="hero-unit">Tonnes</span>
+              </div>
+              <div class="hero-sub font-mono">
+                ~{{ Math.round(res.netResidue / 16) }} Standard 16T Truckloads
+              </div>
+            </div>
+
+            <div class="calc-formula-display font-mono">
+              Formula: {{ customCalc.areaHa }} ha &times; {{ customCalc.customYield }} t/ha &times; {{ customCalc.customRpr }} (RPR) &times; {{ customCalc.customCaf }} (CAF)
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sens-footer">
+        <button type="button" class="btn-primary" (click)="isSensitivityModalOpen.set(false)">
+          <span>Done &bull; Return to Map</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

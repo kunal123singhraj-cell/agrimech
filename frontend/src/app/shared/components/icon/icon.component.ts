@@ -230,6 +230,16 @@ import { CommonModule } from '@angular/common';
         <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"></path>
       </g>
 
+      <!-- Satellite -->
+      <g *ngSwitchCase="'satellite'">
+        <path d="M13 7 9 3 5 7l4 4"></path>
+        <path d="m17 11 4 4-4 4-4-4"></path>
+        <path d="m8 12 4 4 6-6-4-4Z"></path>
+        <path d="m16 8 3-3"></path>
+        <path d="M9 21a6 6 0 0 0-6-6"></path>
+        <path d="M10 16a2 2 0 0 0-2-2"></path>
+      </g>
+
       <!-- Trash -->
       <g *ngSwitchCase="'trash'">
         <polyline points="3 6 5 6 21 6"></polyline>

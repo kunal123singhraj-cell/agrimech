@@ -22,6 +22,7 @@ import transportRoutes from './routes/transportRoutes';
 import paymentRoutes from './routes/paymentRoutes';
 import adminRoutes from './routes/adminRoutes';
 import translationRoutes from './routes/translationRoutes';
+import satelliteRoutes from './routes/satelliteRoutes';
 
 dotenv.config();
 
@@ -57,6 +58,7 @@ app.use('/api/transport', transportRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/translate', translationRoutes);
+app.use('/api/satellite', satelliteRoutes);
 
 // Serve static frontend in production if built
 const candidateDistPaths = [

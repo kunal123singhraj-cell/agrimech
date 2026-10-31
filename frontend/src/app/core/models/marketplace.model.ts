@@ -453,3 +453,78 @@ export interface NotificationItem {
   type: 'offer' | 'order' | 'alert' | 'system' | 'pool' | 'transport' | 'payment';
   link?: string;
 }
+
+// ============================================================================
+// Satellite Supply Intelligence Remote Sensing Models
+// ============================================================================
+
+export type AvailabilityLevel = 'high' | 'medium' | 'low' | 'insufficient';
+
+export type HarvestStatus = 
+  | 'Standing Crop (Vegetative)'
+  | 'Maturing / Near Harvest'
+  | 'Active Harvesting Window'
+  | 'Post-Harvest Stubble Window'
+  | 'Fallow / Stubble Cleared';
+
+export interface CropParameterConfig {
+  cropKey: string;
+  cropName: string;
+  averageYieldPerHa: number;
+  rpr: number;
+  caf: number;
+  calorificValueKcalKg: number;
+  bulkDensityKgM3: number;
+  typicalHarvestWindow: string;
+  fodderRetentionPercent: number;
+  mulchRetentionPercent: number;
+}
+
+export interface SatelliteRegion {
+  id: string;
+  villageName: string;
+  talukTehsil: string;
+  district: string;
+  state: string;
+  lat: number;
+  lng: number;
+  cropKey: string;
+  cropName: string;
+  cultivatedAreaHectares: number;
+  harvestStatus: HarvestStatus;
+  expectedHarvestPeriod: string;
+  lastSatellitePassDate: string;
+  sentinelTileId: string;
+  ndviMean: number;
+  ndreMean: number;
+  cloudCoverPercent: number;
+  predictionConfidencePercent: number;
+  dataMode: 'DEMO_ESTIMATE';
+  notes: string;
+  
+  // Agronomic estimation outputs
+  estimatedCropProductionTonnes: number;
+  rpr: number;
+  caf: number;
+  theoreticalResidueTonnes: number;
+  estimatedResidueTonnes: number;
+  availabilityLevel: AvailabilityLevel;
+  registeredSuppliersCount: number;
+  distanceKm?: number; // Distance from current active hub
+}
+
+export interface SatelliteAggregateMetrics {
+  monitoredRegionsCount: number;
+  totalAreaHectares: number;
+  totalCropProductionTonnes: number;
+  totalResidueTonnes: number;
+  highAvailabilityCount: number;
+  mediumAvailabilityCount: number;
+  lowAvailabilityCount: number;
+  insufficientCount: number;
+  averageConfidencePercent: number;
+  dataMode: 'DEMO_ESTIMATE';
+  spectralSensors: string[];
+  lastPipelineRun: string;
+}
+
