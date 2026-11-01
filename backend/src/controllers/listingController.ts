@@ -177,8 +177,7 @@ export const createListing = async (req: AuthenticatedRequest, res: Response): P
       lng: Number(payload.lng) || 77.4430
     };
 
-    const newListingData: any = {
-      _id: 'LST-' + Date.now().toString().slice(-6),
+    const docToSave: any = {
       sellerId,
       sellerName,
       sellerPhone,
@@ -208,26 +207,38 @@ export const createListing = async (req: AuthenticatedRequest, res: Response): P
       updatedAt: new Date().toISOString()
     };
 
-    // 1. Immediately store into persistent local JSON storage
-    const currentListings = readLocalListings();
-    currentListings.unshift(newListingData);
-    writeLocalListings(currentListings);
+    let savedItem: any = null;
 
-    // 2. Persist to MongoDB Atlas if connection is active
+    // 1. Persist directly to MongoDB Atlas first
     if (mongoose.connection.readyState === 1) {
       try {
-        const mongoSaved = await ListingModel.create(newListingData);
-        newListingData._id = mongoSaved._id.toString();
+        const mongoSaved = await ListingModel.create(docToSave);
+        savedItem = mongoSaved.toObject ? mongoSaved.toObject() : mongoSaved;
+        savedItem._id = mongoSaved._id.toString();
+        console.log('[listingController] SAVED PERMANENTLY TO MONGO ATLAS! ID:', savedItem._id);
       } catch (mongoErr: any) {
-        console.warn('[listingController] Note on MongoDB Atlas write:', mongoErr.message);
+        console.warn('[listingController] MongoDB Atlas save error:', mongoErr.message);
       }
     }
 
+    if (!savedItem) {
+      savedItem = {
+        _id: 'LST-' + Date.now().toString().slice(-6),
+        ...docToSave
+      };
+    }
+
+    // 2. Also record in local JSON storage
+    const currentListings = readLocalListings();
+    currentListings.unshift(savedItem);
+    writeLocalListings(currentListings);
+
     res.status(201).json({
       success: true,
-      data: newListingData,
+      data: savedItem,
       message: 'Residue listing successfully published to the marketplace.'
     });
+
   } catch (error: any) {
     res.status(400).json({ success: false, message: error.message });
   }

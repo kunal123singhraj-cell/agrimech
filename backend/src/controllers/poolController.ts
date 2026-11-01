@@ -94,8 +94,7 @@ export const createPool = async (req: AuthenticatedRequest, res: Response): Prom
       lng: Number(payload.lng) || 77.4430
     };
 
-    const newPoolData: any = {
-      _id: 'POOL-' + Date.now().toString().slice(-6),
+    const docToSave: any = {
       title: payload.title || `${targetTonnes}T ${cropType} Procurement Quota`,
       buyerId,
       buyerName,
@@ -118,26 +117,38 @@ export const createPool = async (req: AuthenticatedRequest, res: Response): Prom
       updatedAt: new Date().toISOString()
     };
 
-    // Save locally
-    const currentPools = readLocalPools();
-    currentPools.unshift(newPoolData);
-    writeLocalPools(currentPools);
+    let savedItem: any = null;
 
-    // Save to Mongo if active
+    // 1. Save to MongoDB Atlas first if connected
     if (mongoose.connection.readyState === 1) {
       try {
-        const mongoSaved = await PoolModel.create(newPoolData);
-        newPoolData._id = mongoSaved._id.toString();
+        const mongoSaved = await PoolModel.create(docToSave);
+        savedItem = mongoSaved.toObject ? mongoSaved.toObject() : mongoSaved;
+        savedItem._id = mongoSaved._id.toString();
+        console.log('[poolController] SAVED PERMANENTLY TO MONGO ATLAS! ID:', savedItem._id);
       } catch (mongoErr: any) {
-        console.warn('[poolController] Note on MongoDB Atlas write:', mongoErr.message);
+        console.warn('[poolController] MongoDB Atlas save error:', mongoErr.message);
       }
     }
 
+    if (!savedItem) {
+      savedItem = {
+        _id: 'POOL-' + Date.now().toString().slice(-6),
+        ...docToSave
+      };
+    }
+
+    // 2. Also record in local JSON storage
+    const currentPools = readLocalPools();
+    currentPools.unshift(savedItem);
+    writeLocalPools(currentPools);
+
     res.status(201).json({
       success: true,
-      data: newPoolData,
+      data: savedItem,
       message: 'Bulk procurement demand pool created successfully.'
     });
+
   } catch (error: any) {
     res.status(400).json({ success: false, message: error.message });
   }

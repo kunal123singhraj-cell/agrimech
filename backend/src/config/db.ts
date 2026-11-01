@@ -50,12 +50,9 @@ export async function purgeHistoricalFakeData(): Promise<void> {
       ]
     });
 
-    // Purge fake listings
+    // Purge fake legacy listings only
     await ListingModel.deleteMany({
-      $or: [
-        { sellerId: { $in: ['USR-FARM-201', 'USR-FARM-202', 'USR-FARM-203', 'USR-FARM-204', 'USR-FARM-205', 'USR-FARM-206', 'LST-101', 'LST-102', 'LST-103', 'LST-104'] } },
-        { sellerPhone: { $in: ['+91 94482 71820', '+91 98860 12844', '+91 97410 88209', '+91 94490 66311', '+91 99010 44218', '+91 98441 55092'] } }
-      ]
+      sellerId: { $in: ['USR-FARM-201', 'USR-FARM-202', 'USR-FARM-203', 'USR-FARM-204', 'USR-FARM-205', 'USR-FARM-206', 'LST-101', 'LST-102', 'LST-103', 'LST-104'] }
     });
 
     // Purge fake procurement pools

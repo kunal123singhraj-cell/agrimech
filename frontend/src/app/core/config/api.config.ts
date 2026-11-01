@@ -10,10 +10,17 @@ export const getApiBaseUrl = (): string => {
     if (win.__AGRIMECH_API_URL__) {
       return win.__AGRIMECH_API_URL__;
     }
-    // When deployed in production on the same domain (e.g. Render, Railway, VPS)
-    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      return '/api';
+    const host = window.location.hostname;
+    const port = window.location.port;
+
+    // If accessed via Angular dev server on port 4200, route to port 5000 on the same host (supports localhost, 127.0.0.1, and LAN IP)
+    if (port === '4200') {
+      return `http://${host}:5000/api`;
     }
+
+    // In production or when served directly from Express on port 5000
+    return '/api';
   }
   return 'http://localhost:5000/api';
 };
+
